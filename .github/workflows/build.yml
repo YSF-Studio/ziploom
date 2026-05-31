@@ -95,6 +95,9 @@ jobs:
   test-windows:
     name: Build (Windows)
     runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -109,11 +112,17 @@ jobs:
       - name: Build frontend
         run: npm run build
       - name: Build Rust (release)
-        shell: powershell
         run: |
           cd src-tauri
-          cargo build --release 2>&1 | Out-File -FilePath $env:TEMP\win_build.txt -Encoding utf8
-          if ($LASTEXITCODE -ne 0) { throw "Build failed with exit $LASTEXITCODE" }
+          cargo build --release 2>&1 | tee /tmp/win_build.txt
+      - name: Upload on failure
+        if: failure()
+        run: |
+          echo "## Windows Build Failed" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -100 /tmp/win_build.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/win_build.txt
       - name: Upload Windows binary
         if: success()
         uses: actions/upload-artifact@v4
