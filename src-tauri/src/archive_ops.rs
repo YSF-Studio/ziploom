@@ -164,7 +164,7 @@ fn file_mtime_unix(path: &Path) -> u64 {
 }
 
 /// Get file permissions as unix mode (for TAR headers)
-fn file_mode(path: &Path) -> u32 {
+fn file_mode(_path: &Path) -> u32 {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
