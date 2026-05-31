@@ -95,59 +95,28 @@ jobs:
   test-windows:
     name: Build (Windows)
     runs-on: windows-latest
-    defaults:
-      run:
-        shell: bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Setup Rust with MSVC
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
-      - name: Install Visual Studio Build Tools
-        run: |
-          choco install visualstudio2022-workload-vctools --no-progress -y --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64;--add Microsoft.VisualStudio.Component.Windows11SDK.22621" 2>&1 | tail -5
       - name: Install npm dependencies
         run: npm ci
       - name: Build frontend
         run: npm run build
-      - name: Diagnose
-        run: |
-          rustc --version
-          cargo --version
-          rustup target list --installed
-          where link.exe 2>/dev/null || echo "link.exe not found"
-          where cl.exe 2>/dev/null || echo "cl.exe not found"
-          echo "--- VC env ---"
-          echo "VCINSTALLDIR: [$VCINSTALLDIR]"
-      - name: Setup MSVC environment
-        run: |
-          # Try to find and setup Visual Studio
-          if [ -f "C:/Program Files/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat" ]; then
-            echo "Found VS2022 Enterprise"
-          elif [ -f "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/Auxiliary/Build/vcvars64.bat" ]; then
-            echo "Found VS2022 Community"
-          else
-            echo "Searching for vcvars..."
-            find "C:/Program Files" -name "vcvars64.bat" 2>/dev/null | head -3
-          fi
       - name: Build Rust (release)
-        run: cd src-tauri && cargo build --release 2>&1 | tee /tmp/win_build.txt
-      - name: Dump Windows build log
-        if: failure()
+        shell: powershell
         run: |
-          echo "## 🔴 Windows Build Failure" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -80 /tmp/win_build.txt >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat /tmp/win_build.txt
+          cd src-tauri
+          cargo build --release 2>&1 | Out-File -FilePath $env:TEMP\win_build.txt -Encoding utf8
+          if ($LASTEXITCODE -ne 0) { throw "Build failed with exit $LASTEXITCODE" }
       - name: Upload Windows binary
-        uses: actions/upload-artifact@v4
         if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: ziploom-windows
           path: src-tauri/target/release/ziploom-tauri.exe
