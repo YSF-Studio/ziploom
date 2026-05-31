@@ -39,7 +39,7 @@ pub fn scan_file_content(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
     let mut threats = Vec::new();
 
     // Skip directory entries
-    if name.ends_with('/') || data.is_empty() {
+    if name.ends_with('/') {
         return threats;
     }
 
@@ -73,6 +73,33 @@ pub fn scan_file_content(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
             severity: "medium".into(),
             detail: "Java .class file inside archive — may contain malicious bytecode".into(),
         });
+    }
+
+    // 7. PDF threat detection
+    if is_pdf(data) {
+        threats.extend(scan_pdf(name, data));
+    }
+
+    // 8. Zero-byte dropper at suspicious paths
+    if data.is_empty() && !name.ends_with('/') {
+        let lower_name = name.to_lowercase();
+        let suspicious_paths = [
+            "/etc/", "/usr/bin/", "/usr/lib/", "/sbin/", "/bin/",
+            "\\windows\\", "\\system32\\", "\\systemroot\\",
+            "/etc/passwd", "/etc/shadow", "/etc/sudoers",
+            "~/.ssh/", "/root/", "\\users\\default\\",
+            "\\programdata\\", "\\temp\\", "/tmp/",
+            "autorun.inf", "boot.ini", "pagefile.sys",
+        ];
+        if suspicious_paths.iter().any(|p| lower_name.contains(p)) {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "ZeroByteDropper".into(),
+                severity: "high".into(),
+                detail: format!("Zero-byte file at suspicious path: '{}' — may be a dropper indicator", name),
+            });
+        }
     }
 
     threats
@@ -226,6 +253,42 @@ pub fn scan_file_name(name: &str) -> Vec<MalwareThreat> {
             severity: "low".into(),
             detail: "Windows shortcut (.lnk) inside archive — commonly used in malware delivery".into(),
         });
+    }
+
+    // Typosquatting detection — brand name impersonation
+    let typosquat_list = [
+        ("facebok", "Facebook"), ("faceboook", "Facebook"),
+        ("googie", "Google"), ("go0gle", "Google"), ("goog1e", "Google"),
+        ("g00gle", "Google"), ("googel", "Google"),
+        ("micosoft", "Microsoft"), ("micros0ft", "Microsoft"),
+        ("micr0soft", "Microsoft"), ("micrsoft", "Microsoft"),
+        ("ad0be", "Adobe"), ("adobe", "Adobe"), ("ad0be_", "Adobe"),
+        ("winrar", "WinRAR"), ("winr4r", "WinRAR"),
+        ("winzip", "WinZip"), ("w1nzip", "WinZip"),
+        ("7ziip", "7-Zip"), ("7-z1p", "7-Zip"),
+        ("v1rus", "likely malware"), ("viru", "likely malware"),
+        ("crack", "pirated software"), ("keygen", "pirated software"),
+        ("patch_", "cracked software"),
+        ("n0rt0n", "Norton"), ("norton", "Norton"),
+        ("mcafee", "McAfee"), ("mcafee_", "McAfee"),
+        ("kaspersky", "Kaspersky"), ("kaspersky", "Kaspersky"),
+    ];
+    let filename_only = std::path::Path::new(name)
+        .file_name()
+        .map(|f| f.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+    // Only check the filename portion to avoid matching directory names
+    for (typo, brand) in &typosquat_list {
+        if filename_only.contains(typo) {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "Typosquatting".into(),
+                severity: "medium".into(),
+                detail: format!("Filename '{}' resembles '{}' — possible brand impersonation", filename_only, brand),
+            });
+            break;
+        }
     }
 
     threats
@@ -871,6 +934,97 @@ fn analyze_elf(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
 /// Java .class file detection — magic CAFEBABE
 fn is_java_class(data: &[u8]) -> bool {
     data.len() >= 4 && data[0] == 0xCA && data[1] == 0xFE && data[2] == 0xBA && data[3] == 0xBE
+}
+
+// ─── PDF Threat Detection ───
+
+/// Minimal PDF detection — magic %PDF
+fn is_pdf(data: &[u8]) -> bool {
+    data.len() >= 4 && data[0] == b'%' && data[1] == b'P' && data[2] == b'D' && data[3] == b'F'
+}
+
+/// Scan PDF for threats: JavaScript, OpenAction, EmbeddedFile, Launch actions
+fn scan_pdf(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
+    let mut threats = Vec::new();
+    let scan_str = String::from_utf8_lossy(data);
+
+    // Check for JavaScript in PDF
+    if scan_str.contains("/JavaScript") || scan_str.contains("/JS") {
+        let js_indicators = [
+            "/JavaScript", "/JS", "app.alert", "app.exec",
+            "this.exportDataObject", "this.importDataObject",
+            "util.printd", "util.printf", "eval(",
+        ];
+        let matches: Vec<&str> = js_indicators.iter()
+            .filter(|&&s| scan_str.contains(s))
+            .map(|&s| s)
+            .collect();
+        if matches.len() >= 2 {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "PDFwithJavaScript".into(),
+                severity: "critical".into(),
+                detail: format!("PDF contains JavaScript ({} indicators): possible exploit", matches.join(", ")),
+            });
+        } else {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "PDFwithJavaScript".into(),
+                severity: "high".into(),
+                detail: "PDF contains JavaScript — may contain exploit code".into(),
+            });
+        }
+    }
+
+    // Check for auto-open / launch actions
+    if scan_str.contains("/OpenAction") && !scan_str.contains("/OpenAction<<") {
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "suspicious".into(),
+            threat: "PDFAutoOpenAction".into(),
+            severity: "critical".into(),
+            detail: "PDF has OpenAction — auto-executes when opened".into(),
+        });
+    }
+
+    // Check for /Launch action (execute external program)
+    if scan_str.contains("/Launch") {
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "suspicious".into(),
+            threat: "PDFLaunchAction".into(),
+            severity: "critical".into(),
+            detail: "PDF contains Launch action — may execute external program".into(),
+        });
+    }
+
+    // Check for embedded files
+    if scan_str.contains("/EmbeddedFile") {
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "suspicious".into(),
+            threat: "PDFEmbeddedFile".into(),
+            severity: "high".into(),
+            detail: "PDF contains embedded file attachment — possible malware delivery".into(),
+        });
+    }
+
+    // Check for encrypted payload in streams (suspicious if combined with JS)
+    if scan_str.contains("/Filter") && scan_str.contains("/JavaScript") {
+        if scan_str.contains("/FlateDecode") || scan_str.contains("/ASCIIHexDecode") || scan_str.contains("/ASCII85Decode") {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "PDFObfuscatedJavaScript".into(),
+                severity: "critical".into(),
+                detail: "PDF has JavaScript with encoded stream — obfuscated exploit payload".into(),
+            });
+        }
+    }
+
+    threats
 }
 
 // ─── Office Macro Detection ───
