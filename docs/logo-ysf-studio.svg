@@ -1,0 +1,32 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Solid color (no gradient — for better ImageMagick compat) -->
+  
+  <!-- Squircle background -->
+  <rect x="32" y="32" width="448" height="448" rx="96" ry="96" fill="#0071e3"/>
+  
+  <!-- Inner circle accent -->
+  <circle cx="256" cy="246" r="140" fill="none" stroke="#40a9ff" stroke-width="4" opacity="0.3"/>
+  
+  <!-- Y letter (left) -->
+  <path d="M190 170 L190 200 L220 245 L220 310" 
+        fill="none" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Y letter (right leg) -->
+  <path d="M220 245 L250 200 L250 170" 
+        fill="none" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- S letter -->
+  <path d="M290 190 Q330 170 330 210 Q330 235 305 245 Q280 255 280 280 Q280 320 320 330" 
+        fill="none" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- F letter -->
+  <path d="M360 170 L360 330 M360 170 L410 170 M360 240 L400 240" 
+        fill="none" stroke="white" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Bottom bar -->
+  <rect x="140" y="390" width="232" height="4" rx="2" fill="white" opacity="0.5"/>
+  
+  <!-- "STUDIO" text -->
+  <text x="256" y="430" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" 
+        font-size="28" font-weight="600" fill="white" opacity="0.85" letter-spacing="8">STUDIO</text>
+</svg>

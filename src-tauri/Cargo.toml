@@ -1,0 +1,60 @@
+[package]
+name = "ziploom-tauri"
+version = "1.0.0"
+description = "ZipLoom - Archive Utility by YSF Studio"
+authors = ["YSF Studio"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "ziploom_tauri_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "2"
+blake3 = "1"
+chrono = { version = "0.4", features = ["serde"] }
+
+# Pure Rust archive engine (zero CLI calls, App Store safe)
+zip = { version = "2", default-features = false, features = ["aes-crypto", "deflate", "bzip2", "time"] }
+tar = "0.4"
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+bzip2 = { version = "0.5", features = ["libbz2-rs-sys"] }
+xz2 = "0.1"
+zstd = { version = "0.13", default-features = false, features = ["zstdmt"] }
+sevenz-rust = { version = "0.6", features = ["aes256"] }
+unrar = "0.4"
+
+# Pure Rust checksum
+sha2 = "0.10"
+sha1 = "0.10"
+md-5 = "0.10"
+crc32fast = "1"
+
+# Ed25519 for offline license verification (pure Rust, App Store safe)
+ed25519-dalek = { version = "2", default-features = false, features = ["alloc"] }
+hex = "0.4"
+rand_core = "0.6"
+	
+# Tauri plugins
+tauri-plugin-single-instance = "2"
+	
+[features]
+master = []
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

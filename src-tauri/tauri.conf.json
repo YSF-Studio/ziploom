@@ -1,0 +1,101 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "ZipLoom",
+  "version": "1.0.0",
+  "identifier": "com.ysfstudio.ZipLoom",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ZipLoom \u2014 Archive Utility",
+        "width": 700,
+        "height": 580,
+        "minWidth": 500,
+        "minHeight": 400,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "fileAssociations": [
+      {
+        "ext": [
+          "zip"
+        ],
+        "mimeType": "application/zip",
+        "name": "ZIP Archive"
+      },
+      {
+        "ext": [
+          "7z"
+        ],
+        "mimeType": "application/x-7z-compressed",
+        "name": "7-Zip Archive"
+      },
+      {
+        "ext": [
+          "rar"
+        ],
+        "mimeType": "application/vnd.rar",
+        "name": "RAR Archive"
+      },
+      {
+        "ext": [
+          "tar"
+        ],
+        "mimeType": "application/x-tar",
+        "name": "TAR Archive"
+      },
+      {
+        "ext": [
+          "gz",
+          "tgz"
+        ],
+        "mimeType": "application/gzip",
+        "name": "GZip Archive"
+      },
+      {
+        "ext": [
+          "bz2",
+          "tbz",
+          "tbz2"
+        ],
+        "mimeType": "application/x-bzip2",
+        "name": "BZip2 Archive"
+      },
+      {
+        "ext": [
+          "xz",
+          "txz"
+        ],
+        "mimeType": "application/x-xz",
+        "name": "XZ Archive"
+      },
+      {
+        "ext": [
+          "zst",
+          "tzst"
+        ],
+        "mimeType": "application/zstd",
+        "name": "Zstandard Archive"
+      }
+    ]
+  }
+}

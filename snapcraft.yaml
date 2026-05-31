@@ -1,0 +1,65 @@
+name: ziploom
+title: "ZipLoom — Archive Utility"
+version: "1.0.0"
+summary: "Pure Rust archive utility — ZIP, TAR, GZ, BZ2, XZ, 7z, RAR"
+description: |
+  ZipLoom is a fast, secure, and private archive utility built with pure Rust.
+  
+  No system CLI calls — 100% sandbox safe. AES-256 encryption, cross-platform.
+  
+  Free features:
+  • Compress: ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ
+  • Extract: ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, 7z, RAR
+  • AES-256 password protection
+  • Clean macOS junk files (.DS_Store, ._*, __MACOSX)
+  • List archive contents
+  • Detect archive format by extension or magic bytes
+  • Checksum (SHA-256, SHA-1, MD5, CRC32)
+  • Hardware-locked license verification
+
+  Premium features (ZipLoom Master):
+  • Convert between archive formats
+  • Split archives into volumes
+  • Update archives (add/remove files)
+  • Verify archive integrity
+
+base: core22
+grade: stable
+confinement: strict
+
+architectures:
+  - build-on: amd64
+    run-on: [amd64, arm64]
+
+apps:
+  ziploom:
+    command: usr/bin/ziploom
+    extensions: [gnome]
+    plugs:
+      - home
+      - removable-media
+      - network
+      - desktop
+      - desktop-legacy
+      - wayland
+      - x11
+
+parts:
+  ziploom:
+    plugin: rust
+    source: .
+    build-packages:
+      - libgtk-3-dev
+      - libwebkit2gtk-4.1-dev
+      - librsvg2-dev
+      - libssl-dev
+      - patchelf
+    stage-packages:
+      - libgtk-3-0
+      - libwebkit2gtk-4.1-0
+      - librsvg2-2
+      - libssl3
+    override-build: |
+      cargo build --release --features master
+      mkdir -p $SNAPCRAFT_PART_INSTALL/usr/bin
+      cp target/release/ziploom $SNAPCRAFT_PART_INSTALL/usr/bin/
