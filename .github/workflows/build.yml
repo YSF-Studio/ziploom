@@ -94,7 +94,7 @@ jobs:
 
   test-windows:
     name: Build (Windows)
-    runs-on: windows-2025
+    runs-on: windows-latest
     defaults:
       run:
         shell: bash
@@ -103,11 +103,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Setup Rust
+      - name: Setup Rust with MSVC
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
+      - name: Install Visual Studio Build Tools
+        run: |
+          choco install visualstudio2022-workload-vctools --no-progress -y --package-parameters "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64;--add Microsoft.VisualStudio.Component.Windows11SDK.22621" 2>&1 | tail -5
       - name: Install npm dependencies
         run: npm ci
       - name: Build frontend
