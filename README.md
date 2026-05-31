@@ -40,7 +40,11 @@
 
 ## 📸 Screenshots
 
-![ZipLoom UI](docs/screenshot_ui.png)
+| Compress | Extract |
+|----------|---------|
+| ![Compress](docs/ss_compress.png) | ![Extract](docs/ss_extract.png) |
+| **Inspect** | **About** |
+| ![Inspect](docs/ss_inspect.png) | ![About](docs/ss_about.png) |
 
 ---
 
