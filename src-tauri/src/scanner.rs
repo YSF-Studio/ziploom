@@ -139,6 +139,52 @@ pub fn scan_file_name(name: &str) -> Vec<MalwareThreat> {
 
     // Script files in archive
     let script_extensions = ["ps1", "psm1", "vbs", "vbe", "bat", "cmd", "js", "jse", "wsf"];
+
+    // Path traversal detection
+    if name.contains("..") {
+        let has_traversal = name.contains("../") || name.contains("..\\")
+            || name.contains("/..") || name.contains("\\..");
+        if has_traversal {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "PathTraversal".into(),
+                severity: "critical".into(),
+                detail: format!("Path traversal detected in entry: '{}' — may attempt to write outside destination directory", name),
+            });
+        }
+    }
+
+    // Absolute path detection
+    if name.starts_with('/') || name.starts_with('\\') {
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "suspicious".into(),
+            threat: "AbsolutePath".into(),
+            severity: "critical".into(),
+            detail: format!("Entry uses absolute path: '{}' — may attempt to overwrite system files", name),
+        });
+    }
+    #[cfg(windows)]
+    {
+        let upper = name.to_uppercase();
+        if upper.starts_with("C:\\") || upper.starts_with("C:/")
+            || upper.starts_with("D:\\") || upper.starts_with("D:/") {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "AbsolutePath".into(),
+                severity: "critical".into(),
+                detail: format!("Entry uses absolute Windows path: '{}'", name),
+            });
+        }
+    }
+
+    // Zero-byte dropper indicator (file 0 byte at suspicious path)
+    // Note: actual 0-byte check happens in scan_file_content when data is empty
+    // but not a directory entry
+
+    // No extension but executable magic — checked in scan_file_content via is_pe()
     if let Some(ext) = std::path::Path::new(name).extension() {
         let ext = ext.to_string_lossy().to_lowercase();
         if script_extensions.contains(&ext.as_str()) {
@@ -934,6 +980,75 @@ pub fn scan_file(name: &str, data: Option<&[u8]>) -> Vec<MalwareThreat> {
     }
 
     threats
+}
+
+/// Scan archive-level metadata untuk bom/dos patterns.
+/// Parameters: total_files, total_compressed_size, total_uncompressed_size
+pub fn scan_archive_metadata(
+    total_files: usize,
+    total_compressed: u64,
+    total_uncompressed: u64,
+) -> Vec<MalwareThreat> {
+    let mut threats = Vec::new();
+
+    // File flood — terlalu banyak file
+    if total_files > 10_000 {
+        threats.push(MalwareThreat {
+            file: "(archive root)".into(),
+            category: "suspicious".into(),
+            threat: "FileFlood".into(),
+            severity: "high".into(),
+            detail: format!(
+                "Archive contains {} files — potential filesystem exhaustion attack",
+                total_files
+            ),
+        });
+    }
+
+    // Zip bomb — rasio kompresi ekstrem
+    if total_compressed > 0 && total_uncompressed > total_compressed * 1000 {
+        let ratio = total_uncompressed / total_compressed;
+        threats.push(MalwareThreat {
+            file: "(archive root)".into(),
+            category: "suspicious".into(),
+            threat: "ZipBomb".into(),
+            severity: "critical".into(),
+            detail: format!(
+                "Extreme compression ratio {}:1 — potential zip bomb (compressed {} → {})",
+                ratio,
+                format_size(total_compressed),
+                format_size(total_uncompressed),
+            ),
+        });
+    }
+
+    // Decompression bomb — uncompressed > 10 GB
+    if total_uncompressed > 10_000_000_000 {
+        threats.push(MalwareThreat {
+            file: "(archive root)".into(),
+            category: "suspicious".into(),
+            threat: "DecompressionBomb".into(),
+            severity: "critical".into(),
+            detail: format!(
+                "Total uncompressed size {} exceeds 10 GB — may cause OOM or disk exhaustion",
+                format_size(total_uncompressed),
+            ),
+        });
+    }
+
+    threats
+}
+
+fn format_size(bytes: u64) -> String {
+    if bytes >= 1_073_741_824 {
+        format!("{:.1} GB", bytes as f64 / 1_073_741_824.0)
+    } else if bytes >= 1_048_576 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{} B", bytes)
+    }
 }
 
 // ─── Tests ───

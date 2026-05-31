@@ -5,6 +5,8 @@ pub mod archive_ops;
 pub mod crypto;
 pub mod filters;
 pub mod license;
+pub mod path_safe;
+pub mod scanner;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -103,6 +105,9 @@ pub struct ForensicReport {
     pub total_size: u64,
     pub entries: Vec<FileEntry>,
     pub anomalies: Vec<Anomaly>,
+    pub threats: Vec<scanner::MalwareThreat>,
+    pub risk_score: f64,
+    pub risk_label: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

@@ -426,7 +426,10 @@ fn do_extract_zip(path: &str, dst: &Path, password: Option<&str>) -> Result<(), 
         };
 
         let name = entry.name().to_string();
-        let safe = name.trim_start_matches('/').trim_start_matches('\\');
+        let safe = match crate::path_safe::safe_entry_path(&name) {
+            Some(p) => p,
+            None => return Err(format!("Path traversal detected: {}", name)),
+        };
         let out_path = dst.join(safe);
 
         if entry.is_dir() {
@@ -1242,6 +1245,7 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
     let pw = password.as_deref();
     let mut all_entries = Vec::new();
     let mut anomalies = Vec::new();
+    let mut all_threats: Vec<crate::scanner::MalwareThreat> = Vec::new();
     let mut total_size: u64 = 0;
 
     match fmt.id.as_str() {
@@ -1325,6 +1329,13 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
                     });
                 }
 
+                // ── Malware Scan ──
+                let mut file_threats = crate::scanner::scan_file_name(&name);
+                if data_ok {
+                    file_threats.extend(crate::scanner::scan_file_content(&name, &data));
+                }
+                all_threats.extend(file_threats);
+
                 all_entries.push(crate::FileEntry {
                     path: name, size, compressed_size: None, ratio: None,
                     is_dir: entry.is_dir(), modified: None, created: None, permissions: None,
@@ -1378,6 +1389,13 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
                             detected.as_deref().unwrap_or("unknown")), severity: "high".into() });
                 }
 
+                // ── Malware Scan ──
+                let mut file_threats = crate::scanner::scan_file_name(&name);
+                if data_ok {
+                    file_threats.extend(crate::scanner::scan_file_content(&name, &data));
+                }
+                all_threats.extend(file_threats);
+
                 all_entries.push(crate::FileEntry {
                     path: name, size, compressed_size: None, ratio: None, is_dir,
                     modified, created: None, permissions,
@@ -1388,10 +1406,16 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
         _ => return Err("Forensic report supports ZIP and TAR formats only".into()),
     }
 
+    // ── Compute Risk Score ──
+    let (risk_score, risk_label) = crate::scanner::compute_risk_score(&all_threats);
+
     Ok(crate::ForensicReport {
         archive_path: path, format: fmt.name,
         total_files: all_entries.len(), total_size,
         entries: all_entries, anomalies,
+        threats: all_threats,
+        risk_score,
+        risk_label,
     })
 }
 
@@ -2824,6 +2848,7 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
     let fmt = detect_format(path.to_string()).ok_or("Unknown format")?;
     let mut all_entries = Vec::new();
     let mut anomalies = Vec::new();
+    let mut all_threats: Vec<crate::scanner::MalwareThreat> = Vec::new();
     let mut total_size: u64 = 0;
 
     match fmt.id.as_str() {
@@ -2863,6 +2888,13 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
                 if magic_match == Some(false) {
                     anomalies.push(crate::Anomaly { file: name.clone(), issue: format!("Extension mismatch: expected '{}', detected '{}'", detected.as_deref().unwrap_or("?"), expected.as_deref().unwrap_or("?")), severity: "high".into() });
                 }
+                // ── Malware Scan ──
+                let mut file_threats = crate::scanner::scan_file_name(&name);
+                if data_ok {
+                    file_threats.extend(crate::scanner::scan_file_content(&name, &data));
+                }
+                all_threats.extend(file_threats);
+
                 all_entries.push(crate::FileEntry {
                     path: name, size, compressed_size: None, ratio: None, is_dir: false,
                     modified: None, created: None, permissions: None,
@@ -2898,6 +2930,13 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
                 if magic_match == Some(false) {
                     anomalies.push(crate::Anomaly { file: name.clone(), issue: format!("Extension mismatch"), severity: "high".into() });
                 }
+                // ── Malware Scan ──
+                let mut file_threats = crate::scanner::scan_file_name(&name);
+                if data_ok {
+                    file_threats.extend(crate::scanner::scan_file_content(&name, &data));
+                }
+                all_threats.extend(file_threats);
+
                 all_entries.push(crate::FileEntry {
                     path: name, size, compressed_size: None, ratio: None, is_dir: false,
                     modified: None, created: None, permissions: None,
@@ -2908,7 +2947,16 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
         _ => return Err("Forensic report supports ZIP and TAR formats only".into()),
     }
 
-    Ok(crate::ForensicReport { archive_path: path.to_string(), format: fmt.name, total_files: all_entries.len(), total_size, entries: all_entries, anomalies })
+    let (risk_score, risk_label) = crate::scanner::compute_risk_score(&all_threats);
+
+    Ok(crate::ForensicReport {
+        archive_path: path.to_string(), format: fmt.name,
+        total_files: all_entries.len(), total_size,
+        entries: all_entries, anomalies,
+        threats: all_threats,
+        risk_score,
+        risk_label,
+    })
 }
 
     fn update_archive_mock(archive_path: String, files: Vec<String>) -> Result<String, String> {
