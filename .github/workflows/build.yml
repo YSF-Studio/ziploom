@@ -137,9 +137,22 @@ jobs:
       - name: Build frontend
         run: npm run build
       - name: Build Rust (release)
+        shell: pwsh
         run: |
-          cd src-tauri
-          cargo build --release --verbose 2>&1 | tee /tmp/win_build.txt
+          # Initialize VS dev environment
+          $vsCore = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\vsdevcmd\core\vsdevcmd.core.bat"
+          if (!(Test-Path $vsCore)) {
+            $vsCore = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\vsdevcmd\core\vsdevcmd.core.bat"
+          }
+          if (Test-Path $vsCore) {
+            Write-Host "Initializing VS environment from: $vsCore"
+            & cmd /c "call `"$vsCore`" -arch=x64 -host_arch=x64 && cd /d src-tauri && cargo build --release --verbose 2>&1" | Tee-Object -FilePath "$env:TEMP\win_build.txt"
+          } else {
+            Write-Host "VS not found, trying direct build..."
+            cd src-tauri
+            cargo build --release --verbose 2>&1 | Tee-Object -FilePath "$env:TEMP\win_build.txt"
+          }
+          if ($LASTEXITCODE -ne 0) { throw "Build failed (exit $LASTEXITCODE)" }
       - name: Upload Windows build log
         if: failure()
         uses: actions/upload-artifact@v4
