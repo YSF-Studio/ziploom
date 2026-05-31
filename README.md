@@ -26,6 +26,7 @@
 - **Entropy analysis** — flags encrypted or compressed content inside archives
 - **Batch hashing** — MD5, SHA-1, SHA-256 per file
 - **Anomaly detection** — high-entropy files, extension mismatch
+- **Malware scoring engine** — heuristic PE, office macro, ransomware & script analysis ([architecture](docs/MALWARE_SCORING_ARCH.md))
 - **Exportable CSV reports** with full evidence trail
 - **File tree view** with sortable columns
 
