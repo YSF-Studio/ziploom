@@ -114,15 +114,20 @@ jobs:
       - name: Build Rust (release)
         run: |
           cd src-tauri
-          cargo build --release 2>&1 | tee /tmp/win_build.txt
-      - name: Upload on failure
+          cargo build --release --verbose 2>&1 | tee /tmp/win_build.txt
+      - name: Upload Windows build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build-log
+          path: /tmp/win_build.txt
+      - name: Dump error to summary
         if: failure()
         run: |
-          echo "## Windows Build Failed" >> $GITHUB_STEP_SUMMARY
+          echo "## Windows Build Error Log" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          tail -100 /tmp/win_build.txt >> $GITHUB_STEP_SUMMARY
+          cat /tmp/win_build.txt >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
-          cat /tmp/win_build.txt
       - name: Upload Windows binary
         if: success()
         uses: actions/upload-artifact@v4
