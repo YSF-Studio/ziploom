@@ -42,7 +42,23 @@ jobs:
           cargo --version
           ls -la src-tauri/
       - name: Run Rust tests
-        run: cd src-tauri && cargo test -- --test-threads=1 --nocapture 2>&1
+        run: |
+          cd src-tauri && cargo test -- --test-threads=1 --nocapture 2>&1 | tee /tmp/test_output.txt
+          echo "EXIT CODE: $?"
+      - name: Dump test log
+        if: failure()
+        run: |
+          echo "## 🔴 Linux Test Failure Log" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -100 /tmp/test_output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/test_output.txt
+      - name: Upload test log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-test-log
+          path: /tmp/test_output.txt
       - name: Build Rust (release)
         run: cd src-tauri && cargo build --release 2>&1
       - name: Upload Linux binary
