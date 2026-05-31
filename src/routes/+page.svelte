@@ -508,6 +508,25 @@
             </div>
           {/if}
 
+          <!-- Threat Detection Results -->
+          {#if insReport && insReport.threats && insReport.threats.length > 0}
+            <div class="threat-summary">
+              <h4>
+                {#if insReport.risk_label === "Malicious"}🚨 MALICIOUS
+                {:else if insReport.risk_label === "Highly Suspicious"}🔴 HIGHLY SUSPICIOUS
+                {:else if insReport.risk_label === "Suspicious"}🟠 SUSPICIOUS
+                {:else if insReport.risk_label === "Low Risk"}🟡 LOW RISK
+                {:else}🟢 CLEAN{/if}
+                — Score: {(insReport.risk_score * 100).toFixed(0)}/100
+              </h4>
+              <p class="threat-count">{insReport.threats.length} threat(s) detected — scroll down for details</p>
+            </div>
+          {:else if insReport && insReport.risk_label === "Clean"}
+            <div class="threat-summary clean">
+              <h4>🟢 CLEAN — No threats detected</h4>
+            </div>
+          {/if}
+
           <!-- File Table -->
           <div class="ins-table-wrap">
             <div class="ins-table" style="min-width:{(colHashes?350:200)+(colEntropy?80:0)+(colMagic?70:0)+(colTime?170:0)}px">
@@ -515,6 +534,7 @@
                 {#if !colSelect}{:else}<label><input type="checkbox" checked={insSelected.length === insEntries.length && insEntries.length > 0} onchange={toggleSelectAll} /></label>{/if}
                 <span class="col-name">Name</span>
                 <span class="col-size">Size</span>
+                <span class="col-threat" style="width:60px;text-align:center">Threat</span>
                 {#if colHashes}<span class="col-hash">MD5</span>
                 <span class="col-hash">SHA256</span>{/if}
                 {#if colEntropy}<span class="col-entropy">Entropy</span>{/if}
@@ -524,12 +544,21 @@
               <div class="ins-body">
                 {#if insViewMode === 'flat'}
                   {#each sortedEntries() as entry}
+                    {@const entryThreats = insReport?.threats?.filter(t => t.file === entry.path) || []}
+                    {@const maxSev = entryThreats.length > 0 ? entryThreats.reduce((a,b) => ["critical","high","medium","low"].indexOf(a.severity) <= ["critical","high","medium","low"].indexOf(b.severity) ? a : b).severity : null}
                     <div class="ins-row" class:selected={insSelected.includes(entry.path)}>
                       {#if !colSelect}{:else}<label><input type="checkbox" checked={insSelected.includes(entry.path)} onchange={() => toggleSelect(entry.path)} /></label>{/if}
                       <span class="col-name" onclick={() => previewFile(entry)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && previewFile(entry)}>
                         {entry.is_dir ? "📁 " : "📄 "}{entry.path.split("/").pop() || entry.path}
                       </span>
                       <span class="col-size">{formatSize(entry.size)}</span>
+                      <span class="col-threat" style="width:60px;text-align:center">
+                        {#if !maxSev}—
+                        {:else if maxSev === "critical"}🔴
+                        {:else if maxSev === "high"}🟠
+                        {:else if maxSev === "medium"}🟡
+                        {:else}🟢{/if}
+                      </span>
                       {#if colHashes}<span class="col-hash hash-short">{(entry.md5||"").slice(0,8)}</span>
                       <span class="col-hash hash-short">{(entry.sha256||"").slice(0,8)}</span>{/if}
                       {#if colEntropy}
@@ -556,18 +585,28 @@
                     <div class="tree-row">
                       <span class="col-name" style="padding-left:0">📁 {node.name}/</span>
                       <span class="col-size">{node.children.filter(c => !c.isDir).length} files</span>
+                      <span class="col-threat" style="width:60px;text-align:center">—</span>
                       {#if colHashes}<span class="col-hash"></span><span class="col-hash"></span>{/if}
                       {#if colEntropy}<span class="col-entropy"></span>{/if}
                       {#if colMagic}<span class="col-magic"></span>{/if}
                       {#if colTime}<span class="col-time"></span>{/if}
                     </div>
                     {#each node.children.filter(c => !c.isDir) as child}
+                      {@const childThreats = insReport?.threats?.filter(t => t.file === child.entry.path) || []}
+                      {@const childSev = childThreats.length > 0 ? childThreats.reduce((a,b) => ["critical","high","medium","low"].indexOf(a.severity) <= ["critical","high","medium","low"].indexOf(b.severity) ? a : b).severity : null}
                       <div class="ins-row" class:selected={insSelected.includes(child.entry.path)} style="padding-left:20px">
                         {#if !colSelect}{:else}<label><input type="checkbox" checked={insSelected.includes(child.entry.path)} onchange={() => toggleSelect(child.entry.path)} /></label>{/if}
                         <span class="col-name" onclick={() => previewFile(child.entry)} role="button" tabindex="0" onkeydown={(e) => e.key === 'Enter' && previewFile(child.entry)}>
                           📄 {child.name}
                         </span>
                         <span class="col-size">{formatSize(child.entry.size)}</span>
+                        <span class="col-threat" style="width:60px;text-align:center">
+                          {#if !childSev}—
+                          {:else if childSev === "critical"}🔴
+                          {:else if childSev === "high"}🟠
+                          {:else if childSev === "medium"}🟡
+                          {:else}🟢{/if}
+                        </span>
                         {#if colHashes}<span class="col-hash hash-short">{(child.entry.md5||"").slice(0,8)}</span>
                         <span class="col-hash hash-short">{(child.entry.sha256||"").slice(0,8)}</span>{/if}
                         {#if colEntropy}
@@ -591,6 +630,24 @@
               </div>
             </div>
           </div>
+
+          <!-- Detailed Threat List -->
+          {#if insReport && insReport.threats && insReport.threats.length > 0}
+            <div class="threat-list">
+              <h4>🚨 Threat Details</h4>
+              {#each insReport.threats as t, i}
+                <div class="threat-item">
+                  <span class="threat-num">#{i+1}</span>
+                  <span class="threat-severity-badge" class:crit={t.severity==="critical"} class:high={t.severity==="high"} class:med={t.severity==="medium"} class:low={t.severity==="low"}>
+                    {t.severity.toUpperCase()}
+                  </span>
+                  <span class="threat-file-name">{t.file}</span>
+                  <span class="threat-category">{t.category}</span>
+                  <p class="threat-detail">{t.detail || t.threat}</p>
+                </div>
+              {/each}
+            </div>
+          {/if}
 
           <!-- Actions -->
           <div class="ins-actions">
@@ -838,4 +895,23 @@
   .hash-results { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
   .hash-results h4 { padding: 8px 12px; background: var(--border); font-size: 12px; }
   .hash-table { padding: 12px; font-family: monospace; font-size: 10px; max-height: 300px; overflow: auto; white-space: pre; background: var(--bg); }
+  /* Threat Detection */
+  .threat-summary { background: color-mix(in srgb, var(--danger) 12%, var(--card)); border: 1px solid var(--danger); border-radius: 10px; padding: 12px; }
+  .threat-summary.clean { background: color-mix(in srgb, var(--success) 10%, var(--card)); border-color: var(--success); }
+  .threat-summary h4 { font-size: 14px; }
+  .threat-count { font-size: 11px; color: #86868b; margin-top: 4px; }
+  .col-threat { width: 60px; text-align: center; flex-shrink: 0; font-size: 14px; }
+  .threat-list { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .threat-list h4 { padding: 8px 12px; background: color-mix(in srgb, var(--danger) 10%, var(--card)); border-bottom: 1px solid var(--border); font-size: 12px; }
+  .threat-item { padding: 8px 12px; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent); font-size: 12px; display: grid; grid-template-columns: 28px 80px 1fr 70px; gap: 8px; align-items: start; }
+  .threat-item:last-child { border-bottom: none; }
+  .threat-num { color: #86868b; font-size: 10px; font-family: monospace; }
+  .threat-severity-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 9px; font-weight: 700; text-align: center; }
+  .threat-severity-badge.crit { background: color-mix(in srgb, var(--danger) 20%, var(--card)); color: var(--danger); }
+  .threat-severity-badge.high { background: color-mix(in srgb, var(--warn) 20%, var(--card)); color: var(--warn); }
+  .threat-severity-badge.med { background: color-mix(in srgb, #ff9f0a 15%, var(--card)); color: #ff9f0a; }
+  .threat-severity-badge.low { background: color-mix(in srgb, var(--accent) 15%, var(--card)); color: var(--accent); }
+  .threat-file-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .threat-category { font-size: 10px; color: #86868b; text-align: right; }
+  .threat-detail { grid-column: 1 / -1; font-size: 11px; color: #86868b; line-height: 1.4; margin-top: -4px; }
 </style>
