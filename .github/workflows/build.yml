@@ -5,7 +5,11 @@ on:
     branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
   test-linux:
@@ -28,36 +32,22 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            src-tauri/target/
-            ~/.cargo/registry/
-            ~/.cargo/git/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-      - name: Cache Node dependencies
-        uses: actions/cache@v4
-        with:
-          path: node_modules/
-          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
       - name: Install npm dependencies
         run: npm ci
       - name: Build frontend
         run: npm run build
+      - name: Diagnose
+        run: |
+          rustc --version
+          cargo --version
+          ls -la src-tauri/
       - name: Run Rust tests
-        run: cd src-tauri && cargo test
-        env:
-          RUST_BACKTRACE: 1
-          CARGO_TERM_COLOR: always
+        run: cd src-tauri && cargo test -- --test-threads=1 --nocapture 2>&1
       - name: Build Rust (release)
-        run: cd src-tauri && cargo build --release
+        run: cd src-tauri && cargo build --release 2>&1
       - name: Upload Linux binary
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: ziploom-linux
           path: src-tauri/target/release/ziploom-tauri
@@ -78,16 +68,17 @@ jobs:
       - name: Build frontend
         run: npm run build
       - name: Build Rust (release)
-        run: cd src-tauri && cargo build --release
+        run: cd src-tauri && cargo build --release 2>&1
       - name: Upload macOS binary
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: ziploom-macos
           path: src-tauri/target/release/ziploom-tauri
 
   test-windows:
     name: Build (Windows)
-    runs-on: windows-latest
+    runs-on: windows-2025
     defaults:
       run:
         shell: bash
@@ -96,7 +87,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
@@ -104,20 +96,25 @@ jobs:
         run: npm ci
       - name: Build frontend
         run: npm run build
+      - name: Diagnose
+        run: |
+          rustc --version
+          cargo --version
+          rustup target list --installed
       - name: Build Rust (release)
-        run: cd src-tauri && cargo build --release
-        env:
-          RUST_BACKTRACE: 1
+        run: cd src-tauri && cargo build --release 2>&1
       - name: Upload Windows binary
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: ziploom-windows
           path: src-tauri/target/release/ziploom-tauri.exe
 
   bundle-linux:
-    name: Bundle (Linux .deb + .AppImage)
+    name: Bundle (Linux)
     needs: [test-linux]
     runs-on: ubuntu-latest
+    if: success()
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -135,20 +132,10 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             patchelf
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            src-tauri/target/
-            ~/.cargo/registry/
-            ~/.cargo/git/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
       - name: Install npm dependencies
         run: npm ci
-      - name: Build Tauri bundle
-        run: npm run tauri -- build --bundles deb,appimage
+      - name: Build Tauri bundles
+        run: npm run tauri -- build --bundles deb,appimage 2>&1
       - name: Upload .deb
         uses: actions/upload-artifact@v4
         with:
