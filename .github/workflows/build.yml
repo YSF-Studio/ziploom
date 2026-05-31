@@ -118,7 +118,15 @@ jobs:
           cargo --version
           rustup target list --installed
       - name: Build Rust (release)
-        run: cd src-tauri && cargo build --release 2>&1
+        run: cd src-tauri && cargo build --release 2>&1 | tee /tmp/win_build.txt
+      - name: Dump Windows build log
+        if: failure()
+        run: |
+          echo "## 🔴 Windows Build Failure" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          tail -80 /tmp/win_build.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat /tmp/win_build.txt
       - name: Upload Windows binary
         uses: actions/upload-artifact@v4
         if: success()
