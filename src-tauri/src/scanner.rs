@@ -199,7 +199,7 @@ pub fn scan_file_name(name: &str) -> Vec<MalwareThreat> {
     }
 
     // Script files in archive
-    let script_extensions = ["ps1", "psm1", "vbs", "vbe", "bat", "cmd", "js", "jse", "wsf"];
+    let script_extensions = ["ps1", "psm1", "vbs", "vbe", "bat", "cmd", "js", "jse", "wsf", "ahk"];
 
     // Path traversal detection
     if name.contains("..") {
@@ -1616,6 +1616,62 @@ fn check_suspicious_content(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
                     threat: "DangerousBashScript".into(),
                     severity: "high".into(),
                     detail: format!("Dangerous Bash patterns: {}", bash_matches.join(", ")),
+                });
+            }
+        }
+
+        // AutoHotKey (AHK) dangerous patterns
+        if lower.ends_with(".ahk") {
+            let ahk_dangerous = [
+                ("run,", "Process execution"), ("runwait,", "Process execution"),
+                ("process,", "Process manipulation"),
+                ("urldownloadtofile", "File download"),
+                ("winhttp", "HTTP request"), ("comobjcreate", "COM object"),
+                ("dllcall", "DLL function call"),
+                ("fileinstall", "Embedded file extraction"),
+                ("filecreatedir", "Directory creation"),
+                ("filewrite", "File write"), ("fileappend", "File append"),
+                ("iniread", "INI read"), ("iniwrite", "INI write"),
+                ("regread", "Registry read"), ("regwrite", "Registry write"),
+                ("regdelete", "Registry delete"),
+                ("send,", "Keystroke injection"), ("sendinput", "Keystroke injection"),
+                ("blockinput", "Input blocking"),
+                ("msgbox", "Dialog display"),
+                ("clipboard", "Clipboard access"),
+            ];
+            let ahk_matches: Vec<&str> = ahk_dangerous.iter()
+                .filter(|&&(k, _)| lower.contains(k))
+                .map(|&(k, _)| k)
+                .collect();
+            if ahk_matches.len() >= 3 {
+                threats.push(MalwareThreat {
+                    file: name.to_string(),
+                    category: "suspicious".into(),
+                    threat: "DangerousAHKScript".into(),
+                    severity: "high".into(),
+                    detail: format!("Suspicious AHK script with {} dangerous patterns: {}", ahk_matches.len(), ahk_matches.join(", ")),
+                });
+            }
+        }
+
+        // Entropy-based anomaly: text files with unusually high entropy
+        let text_extensions = [".txt", ".md", ".csv", ".xml", ".json", ".cfg", ".ini", ".log", ".config"];
+        let is_text = text_extensions.iter().any(|e| lower.ends_with(e));
+        if is_text && data.len() > 100 && data.len() < 100_000 {
+            let mut freq = [0u64; 256];
+            for &b in data { freq[b as usize] += 1; }
+            let len = data.len() as f64;
+            let entropy: f64 = freq.iter()
+                .filter(|&&c| c > 0)
+                .map(|&c| { let p = c as f64 / len; -p * p.log2() })
+                .sum();
+            if entropy > 7.3 {
+                threats.push(MalwareThreat {
+                    file: name.to_string(),
+                    category: "suspicious".into(),
+                    threat: "HighEntropyText".into(),
+                    severity: "medium".into(),
+                    detail: format!("Text file has entropy {:.2} — unusually high for plain text, possible encrypted/encoded payload", entropy),
                 });
             }
         }

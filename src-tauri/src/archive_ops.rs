@@ -1414,11 +1414,28 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
                 if data_ok {
                     file_threats.extend(crate::scanner::scan_file_content(&name, &data));
                 }
+
+                // Symlink detection for TAR entries
+                #[cfg(unix)]
+                if entry.header().entry_type().is_symlink() {
+                    if let Ok(link_target) = entry.link_name() {
+                        if let Some(target) = link_target {
+                            file_threats.push(crate::scanner::MalwareThreat {
+                                file: name.clone(),
+                                category: "suspicious".into(),
+                                threat: "SymlinkInArchive".into(),
+                                severity: "high".into(),
+                                detail: format!("Symlink entry '{}' → '{}' — may attempt to redirect reads to sensitive files", name, target.to_string_lossy()),
+                            });
+                        }
+                    }
+                }
+
                 all_threats.extend(file_threats);
 
                 // Nested archive detection for TAR entries
                 if data_ok && data.len() >= 4 {
-                    let is_archive = (data[..4] == *b"PK")
+                    let is_archive = (data[..4] == *b"PK\x03\x04")
                         || (data.len() >= 6 && data[..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
                         || (data.starts_with(b"Rar!"))
                         || (data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b)
