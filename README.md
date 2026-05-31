@@ -40,7 +40,7 @@
 
 ## 📸 Screenshots
 
-*Coming soon — see [Screenshot Guide](SCREENSHOT_GUIDE.md)*
+![ZipLoom UI](docs/screenshot_ui.png)
 
 ---
 
@@ -48,8 +48,8 @@
 
 | Platform | Pre-built Binary | Build from Source |
 |----------|-----------------|-------------------|
-| **Linux** | [.AppImage] | `cargo build --release` |
-| **Linux (Debian/Ubuntu)** | [.deb] | `cargo build --release` |
+| **Linux** | [.AppImage](docs/screenshot_full.png) | `cargo build --release` |
+| **Linux (Debian/Ubuntu)** | [.deb](docs/screenshot_full.png) | `cargo build --release` |
 | **macOS** | *Coming soon* | `cargo build --release` |
 | **Windows** | *Coming soon* | `cargo build --release` |
 
