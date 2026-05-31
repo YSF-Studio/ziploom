@@ -107,6 +107,8 @@ jobs:
         with:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
+      - name: Setup MSVC dev command prompt
+        uses: TheMrMilchmann/setup-msvc-dev@v3
       - name: Install npm dependencies
         run: npm ci
       - name: Build frontend
