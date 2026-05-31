@@ -107,8 +107,31 @@ jobs:
         with:
           toolchain: stable
           targets: x86_64-pc-windows-msvc
-      - name: Setup MSVC dev command prompt
-        uses: TheMrMilchmann/setup-msvc-dev@v3
+      - name: Setup Visual Studio environment
+        shell: pwsh
+        run: |
+          # Find and initialize VS dev environment
+          $vswhere = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\Common7\Tools\vsdevcmd\core\vsdevcmd.core.bat"
+          if (Test-Path $vswhere) {
+            echo "Found VS2022 Enterprise"
+            & cmd /c "call `"$vswhere`" -arch=x64 -host_arch=x64 && set" | ForEach-Object {
+              if ($_ -match "^(.*?)=(.*)$") {
+                [Environment]::SetEnvironmentVariable($matches[1], $matches[2], "Process")
+              }
+            }
+          } else {
+            echo "VS2022 Enterprise not found, trying Community..."
+            $vswhere = "C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\Tools\vsdevcmd\core\vsdevcmd.core.bat"
+            if (Test-Path $vswhere) {
+              & cmd /c "call `"$vswhere`" -arch=x64 -host_arch=x64 && set" | ForEach-Object {
+                if ($_ -match "^(.*?)=(.*)$") {
+                  [Environment]::SetEnvironmentVariable($matches[1], $matches[2], "Process")
+                }
+              }
+            }
+          }
+          echo "LIB=[$env:LIB]"
+          echo "PATH includes lib.exe: $(where.exe lib.exe 2>$null)"
       - name: Install npm dependencies
         run: npm ci
       - name: Build frontend
