@@ -7,6 +7,9 @@
 /// 2. Office Macro Detection — scan VBA project untuk keyword berbahaya
 /// 3. Ransomware Heuristic — deteksi ransom note, encrypted file patterns
 /// 4. General Suspicious — double extension, executable in archive, hidden files
+/// 5. ELF Executable Analysis — parse header, detect suspicious sections/interpreter
+/// 6. Java Class Detection — magic byte CAFEBABE
+/// 7. Archive-Level Heuristics — zip bomb, decompression bomb, file flood, deep nesting
 
 use serde::{Deserialize, Serialize};
 
@@ -55,6 +58,22 @@ pub fn scan_file_content(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
 
     // 4. General file-level heuristics
     threats.extend(check_suspicious_content(name, data));
+
+    // 5. ELF executable analysis
+    if is_elf(data) {
+        threats.extend(analyze_elf(name, data));
+    }
+
+    // 6. Java class file detection
+    if is_java_class(data) {
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "suspicious".into(),
+            threat: "JavaClassFile".into(),
+            severity: "medium".into(),
+            detail: "Java .class file inside archive — may contain malicious bytecode".into(),
+        });
+    }
 
     threats
 }
@@ -590,6 +609,270 @@ fn analyze_pe_imports(name: &str, data: &[u8], pe_offset: usize, _magic: u16) ->
     threats
 }
 
+// ─── ELF Executable Analysis ───
+
+/// Minimal ELF detection — magic byte \x7fELF
+fn is_elf(data: &[u8]) -> bool {
+    data.len() >= 4 && data[0] == 0x7f && data[1] == b'E' && data[2] == b'L' && data[3] == b'F'
+}
+
+/// Analyze ELF file for suspicious characteristics
+fn analyze_elf(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
+    let mut threats = Vec::new();
+
+    // Check ELF class (32-bit vs 64-bit)
+    let elf_class = data.get(4).copied().unwrap_or(0);
+    // 1 = 32-bit, 2 = 64-bit
+
+    // Check byte order
+    let _byte_order = data.get(5).copied().unwrap_or(0);
+
+    // OS/ABI at byte 7
+    let osabi = data.get(7).copied().unwrap_or(0);
+    // 0x00 = System V, 0x03 = Linux, 0x09 = FreeBSD
+
+    if osabi != 0x00 && osabi != 0x03 {
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "pe".into(),  // reuse pe category for executables
+            threat: "RareELFabI".into(),
+            severity: "low".into(),
+            detail: format!("Uncommon ELF OS/ABI: 0x{:02X}", osabi),
+        });
+    }
+
+    // Entry point
+    let entry_offset = if elf_class == 2 {
+        // 64-bit: entry at offset 24 (8 bytes)
+        if data.len() < 32 { return threats; }
+        u64::from_le_bytes([
+            data[24], data[25], data[26], data[27],
+            data[28], data[29], data[30], data[31],
+        ])
+    } else if elf_class == 1 {
+        // 32-bit: entry at offset 24 (4 bytes)
+        if data.len() < 28 { return threats; }
+        u64::from_le_bytes([
+            data[24], data[25], data[26], data[27],
+            0, 0, 0, 0,
+        ])
+    } else {
+        return threats;
+    };
+
+    // Suspicious: entry point 0 for executables (not shared objects)
+    let e_type = u16::from_le_bytes([data.get(16).copied().unwrap_or(0), data.get(17).copied().unwrap_or(0)]);
+    // 2 = ET_EXEC, 3 = ET_DYN (shared)
+
+    if e_type == 2 && entry_offset == 0 {
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "pe".into(),
+            threat: "ZeroEntryPoint".into(),
+            severity: "high".into(),
+            detail: "ELF executable has entry point at 0 — heavily packed or malicious".into(),
+        });
+    }
+
+    // Check program headers for suspicious interpreters
+    let phoff = if elf_class == 2 {
+        u64::from_le_bytes([
+            data.get(32).copied().unwrap_or(0),
+            data.get(33).copied().unwrap_or(0),
+            data.get(34).copied().unwrap_or(0),
+            data.get(35).copied().unwrap_or(0),
+            data.get(36).copied().unwrap_or(0),
+            data.get(37).copied().unwrap_or(0),
+            data.get(38).copied().unwrap_or(0),
+            data.get(39).copied().unwrap_or(0),
+        ]) as usize
+    } else {
+        let base = 28;
+        u64::from_le_bytes([
+            data.get(base).copied().unwrap_or(0),
+            data.get(base+1).copied().unwrap_or(0),
+            data.get(base+2).copied().unwrap_or(0),
+            data.get(base+3).copied().unwrap_or(0),
+            0, 0, 0, 0,
+        ]) as usize
+    };
+
+    let phentsize = data.get(54).copied().unwrap_or(0) as usize; // Actually 52 for 32-bit, 58 for 64-bit
+    let phnum = data.get(56).copied().unwrap_or(0) as usize;     // 56 for both
+
+    if phoff > 0 && phoff < data.len() && phentsize >= 32 {
+        // Scan program headers for PT_INTERP (type 3)
+        for i in 0..phnum.min(16) {
+            let phdr = phoff + i * phentsize.max(32);
+            if phdr + 8 > data.len() { break; }
+
+            let p_type = if elf_class == 2 {
+                u32::from_le_bytes([data[phdr], data[phdr+1], data[phdr+2], data[phdr+3]])
+            } else {
+                u32::from_le_bytes([data[phdr], data[phdr+1], data[phdr+2], data[phdr+3]])
+            };
+
+            // PT_INTERP = 3
+            if p_type == 3 {
+                // Find interpreter string in data
+                let offset_field = if elf_class == 2 {
+                    let off = phdr + 8;
+                    if off + 8 > data.len() { continue; }
+                    u64::from_le_bytes([
+                        data[off], data[off+1], data[off+2], data[off+3],
+                        data[off+4], data[off+5], data[off+6], data[off+7],
+                    ]) as usize
+                } else {
+                    let off = phdr + 4;
+                    if off + 4 > data.len() { continue; }
+                    u64::from_le_bytes([
+                        data[off], data[off+1], data[off+2], data[off+3],
+                        0, 0, 0, 0,
+                    ]) as usize
+                };
+
+                let filesz_field = if elf_class == 2 {
+                    let off = phdr + 32;
+                    if off + 8 > data.len() { continue; }
+                    u64::from_le_bytes([
+                        data[off], data[off+1], data[off+2], data[off+3],
+                        data[off+4], data[off+5], data[off+6], data[off+7],
+                    ]) as usize
+                } else {
+                    let off = phdr + 20;
+                    if off + 4 > data.len() { continue; }
+                    u32::from_le_bytes([
+                        data[off], data[off+1], data[off+2], data[off+3],
+                    ]) as usize
+                };
+
+                // Bound check for interpreter string
+                if offset_field < data.len() && filesz_field > 0 {
+                    let end = (offset_field + filesz_field).min(data.len());
+                    if end > offset_field {
+                        if let Ok(interp) = std::str::from_utf8(&data[offset_field..end]) {
+                            let interp = interp.trim_end_matches('\0');
+                            if interp.contains("sh") || interp.contains("ld-") {
+                                // normal
+                            } else if interp.contains("libc") {
+                                // normal
+                            } else if interp.contains("/tmp/") || interp.contains("/dev/") {
+                                threats.push(MalwareThreat {
+                                    file: name.to_string(),
+                                    category: "pe".into(),
+                                    threat: "SuspiciousInterpreter".into(),
+                                    severity: "high".into(),
+                                    detail: format!("ELF uses suspicious interpreter: '{}'", interp),
+                                });
+                            }
+                        }
+                    }
+                }
+                break; // Only one PT_INTERP
+            }
+        }
+    }
+
+    // Check for RPATH/RUNPATH with suspicious paths
+    if contains_case_insensitive(data, b"RPATH=") || contains_case_insensitive(data, b"RUNPATH=") {
+        if contains_case_insensitive(data, b"/tmp/") || contains_case_insensitive(data, b"/var/tmp/") {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "pe".into(),
+                threat: "SuspiciousRpath".into(),
+                severity: "high".into(),
+                detail: "ELF RPATH/RUNPATH points to temporary directory — possible DLL hijacking".into(),
+            });
+        }
+    }
+
+    // Check section header for suspicious section names
+    let shoff = if elf_class == 2 {
+        let off = 40;
+        if off + 8 > data.len() { return threats; }
+        u64::from_le_bytes([
+            data[off], data[off+1], data[off+2], data[off+3],
+            data[off+4], data[off+5], data[off+6], data[off+7],
+        ]) as usize
+    } else {
+        let off = 32;
+        if off + 4 > data.len() { return threats; }
+        u32::from_le_bytes([data[off], data[off+1], data[off+2], data[off+3]]) as usize
+    };
+
+    let shstrndx = u16::from_le_bytes([data.get(50).copied().unwrap_or(0), data.get(51).copied().unwrap_or(0)]) as usize;
+
+    if shoff > 0 && shoff < data.len() {
+        let shentsize = u16::from_le_bytes([data.get(58).copied().unwrap_or(0), data.get(59).copied().unwrap_or(0)]) as usize;
+        let shnum = u16::from_le_bytes([data.get(60).copied().unwrap_or(0), data.get(61).copied().unwrap_or(0)]) as usize;
+        let section_size = shentsize.max(64);
+
+        for i in 0..shnum.min(40) {
+            let shdr = shoff + i * section_size;
+            if shdr + 16 > data.len() { break; }
+
+            // Get section name offset in string table
+            let sh_name_off = u32::from_le_bytes([
+                data.get(shdr).copied().unwrap_or(0),
+                data.get(shdr+1).copied().unwrap_or(0),
+                data.get(shdr+2).copied().unwrap_or(0),
+                data.get(shdr+3).copied().unwrap_or(0),
+            ]) as usize;
+
+            // Try to get section name from string table
+            let strtab_off = shoff + shstrndx * section_size;
+            if strtab_off + 8 > data.len() { continue; }
+            let strtab_fileoff = if elf_class == 2 {
+                let off = strtab_off + 24;
+                if off + 8 > data.len() { continue; }
+                u64::from_le_bytes([
+                    data[off], data[off+1], data[off+2], data[off+3],
+                    data[off+4], data[off+5], data[off+6], data[off+7],
+                ]) as usize
+            } else {
+                let off = strtab_off + 16;
+                if off + 4 > data.len() { continue; }
+                u32::from_le_bytes([data[off], data[off+1], data[off+2], data[off+3]]) as usize
+            };
+
+            if sh_name_off + 8 > data.len() || strtab_fileoff + sh_name_off + 8 > data.len() {
+                continue;
+            }
+
+            let sec_name_start = strtab_fileoff + sh_name_off;
+            if sec_name_start >= data.len() { continue; }
+            let sec_name_end = data[sec_name_start..].iter().position(|&b| b == 0).unwrap_or(8);
+            let sec_name = std::str::from_utf8(&data[sec_name_start..sec_name_start + sec_name_end.min(8)]).unwrap_or("?");
+
+            let suspicious_elf_sections = [
+                "packed", "UPX0", "UPX1", "upx", ".upx", ".packed",
+                "themida", "vmp0", "vmp1", ".vmp", ".enigma",
+            ];
+            for sus in &suspicious_elf_sections {
+                if sec_name.contains(sus) {
+                    threats.push(MalwareThreat {
+                        file: name.to_string(),
+                        category: "pe".into(),
+                        threat: "PackedExecutable".into(),
+                        severity: "high".into(),
+                        detail: format!("ELF section '{}' indicates packer/protector — common malware obfuscation", sec_name),
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    threats
+}
+
+// ─── Java Class File Detection ───
+
+/// Java .class file detection — magic CAFEBABE
+fn is_java_class(data: &[u8]) -> bool {
+    data.len() >= 4 && data[0] == 0xCA && data[1] == 0xFE && data[2] == 0xBA && data[3] == 0xBE
+}
+
 // ─── Office Macro Detection ───
 
 fn is_office_doc(name: &str) -> bool {
@@ -926,6 +1209,70 @@ fn check_suspicious_content(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
                 });
             }
         }
+
+        // Python dangerous scripts
+        if lower.contains("eval(") || lower.contains("exec(") || lower.contains("__import__") {
+            let python_dangerous = [
+                ("base64.b64decode", "Base64 decoding"),
+                ("base64.b64encode", "Base64 encoding"),
+                ("subprocess.call", "Process execution"),
+                ("subprocess.popen", "Process execution"),
+                ("subprocess.run", "Process execution"),
+                ("os.system", "OS command execution"),
+                ("os.popen", "OS command execution"),
+                ("os.exec", "OS execution"),
+                ("ctypes.windll", "Windows API access"),
+                ("ctypes.cdll", "Dynamic library loading"),
+                ("socket", "Network communication"),
+                ("requests.get", "HTTP request"),
+                ("requests.post", "HTTP request"),
+                ("urllib.request", "URL request"),
+            ];
+            let python_matches: Vec<&str> = python_dangerous.iter()
+                .filter(|&&(k, _)| lower.contains(k))
+                .map(|&(k, _)| k)
+                .collect();
+            if python_matches.len() >= 2 {
+                threats.push(MalwareThreat {
+                    file: name.to_string(),
+                    category: "suspicious".into(),
+                    threat: "DangerousPythonScript".into(),
+                    severity: "high".into(),
+                    detail: format!("Dangerous Python patterns: {}", python_matches.join(", ")),
+                });
+            }
+        }
+
+        // Bash dangerous patterns
+        let bash_like = lower.contains("#!/bin/sh") || lower.contains("#!/bin/bash") || lower.contains("#!/usr/bin/env");
+        if bash_like {
+            let bash_dangerous = [
+                ("curl|sh", "Remote script execution via curl"),
+                ("curl|bash", "Remote script execution via curl"),
+                ("wget|sh", "Remote script execution via wget"),
+                ("wget|bash", "Remote script execution via wget"),
+                ("/dev/tcp", "TCP socket access"),
+                ("chmod +x", "Make executable"),
+                (":(){ :|:& };:", "Fork bomb"),
+                ("mkfifo", "Named pipe creation"),
+                ("mknod", "Device node creation"),
+                (">/dev/tcp", "Network redirect"),
+                ("exec 5<>/dev/tcp", "File descriptor socket"),
+            ];
+            let bash_matches: Vec<&str> = bash_dangerous.iter()
+                .filter(|&&(k, _)| lower.contains(k))
+                .map(|&(k, _)| k)
+                .collect();
+            if bash_matches.len() >= 2 {
+                threats.push(MalwareThreat {
+                    file: name.to_string(),
+                    category: "suspicious".into(),
+                    threat: "DangerousBashScript".into(),
+                    severity: "high".into(),
+                    detail: format!("Dangerous Bash patterns: {}", bash_matches.join(", ")),
+                });
+            }
+        }
     }
 
     threats
@@ -988,6 +1335,7 @@ pub fn scan_archive_metadata(
     total_files: usize,
     total_compressed: u64,
     total_uncompressed: u64,
+    total_nested_archives: usize,
 ) -> Vec<MalwareThreat> {
     let mut threats = Vec::new();
 
@@ -1032,6 +1380,20 @@ pub fn scan_archive_metadata(
             detail: format!(
                 "Total uncompressed size {} exceeds 10 GB — may cause OOM or disk exhaustion",
                 format_size(total_uncompressed),
+            ),
+        });
+    }
+
+    // Deep nesting — too many archives inside archives
+    if total_nested_archives >= 3 {
+        threats.push(MalwareThreat {
+            file: "(archive root)".into(),
+            category: "suspicious".into(),
+            threat: "DeepNesting".into(),
+            severity: "high".into(),
+            detail: format!(
+                "Archive contains {} nested archives — potential decompression loop attack",
+                total_nested_archives
             ),
         });
     }

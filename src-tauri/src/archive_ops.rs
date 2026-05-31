@@ -1247,6 +1247,8 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
     let mut anomalies = Vec::new();
     let mut all_threats: Vec<crate::scanner::MalwareThreat> = Vec::new();
     let mut total_size: u64 = 0;
+    let mut total_compressed: u64 = 0;
+    let mut total_nested_archives: usize = 0;
 
     match fmt.id.as_str() {
         "zip" => {
@@ -1297,9 +1299,23 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
                 let name = entry.name().to_string();
                 let size = entry.size();
                 total_size += size;
+                total_compressed += entry.compressed_size();
 
                 let mut data = Vec::new();
                 let data_ok = std::io::copy(&mut entry, &mut data).is_ok();
+
+                // Nested archive detection
+                if data_ok && data.len() >= 4 {
+                    let is_archive = (data[..4] == *b"PK")
+                        || (data.len() >= 6 && data[..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
+                        || (data.starts_with(b"Rar!"))
+                        || (data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b)
+                        || (data.starts_with(b"BZ"))
+                        || (data.len() >= 6 && data[0] == 0xfd && data[1..6] == [0x37, 0x7a, 0x58, 0x5a, 0x00]);
+                    if is_archive {
+                        total_nested_archives += 1;
+                    }
+                }
                 let (md5, sha1, sha256, entropy, magic_match, detected, expected) = if data_ok {
                     compute_analysis(&data, &name)
                 } else {
@@ -1352,6 +1368,10 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
                 "zst" => Box::new(zstd::stream::Decoder::new(file).map_err(|e| format!("Zstd: {}", e))?),
                 _ => Box::new(file),
             };
+            // For compressed-tar formats, use file size as approximated compressed size
+            if let Ok(meta) = std::fs::metadata(&path) {
+                total_compressed = meta.len();
+            }
             let mut archive = tar::Archive::new(reader);
 
             for entry in archive.entries().map_err(|e| e.to_string())? {
@@ -1396,6 +1416,19 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
                 }
                 all_threats.extend(file_threats);
 
+                // Nested archive detection for TAR entries
+                if data_ok && data.len() >= 4 {
+                    let is_archive = (data[..4] == *b"PK")
+                        || (data.len() >= 6 && data[..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
+                        || (data.starts_with(b"Rar!"))
+                        || (data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b)
+                        || (data.starts_with(b"BZ"))
+                        || (data.len() >= 6 && data[0] == 0xfd && data[1..6] == [0x37, 0x7a, 0x58, 0x5a, 0x00]);
+                    if is_archive {
+                        total_nested_archives += 1;
+                    }
+                }
+
                 all_entries.push(crate::FileEntry {
                     path: name, size, compressed_size: None, ratio: None, is_dir,
                     modified, created: None, permissions,
@@ -1405,6 +1438,15 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
         }
         _ => return Err("Forensic report supports ZIP and TAR formats only".into()),
     }
+
+    // ── Archive-Level Metadata Scan ──
+    let archive_threats = crate::scanner::scan_archive_metadata(
+        all_entries.len(),
+        total_compressed,
+        total_size,
+        total_nested_archives,
+    );
+    all_threats.extend(archive_threats);
 
     // ── Compute Risk Score ──
     let (risk_score, risk_label) = crate::scanner::compute_risk_score(&all_threats);
@@ -2850,6 +2892,8 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
     let mut anomalies = Vec::new();
     let mut all_threats: Vec<crate::scanner::MalwareThreat> = Vec::new();
     let mut total_size: u64 = 0;
+    let mut total_compressed: u64 = 0;
+    let mut total_nested_archives: usize = 0;
 
     match fmt.id.as_str() {
         "zip" => {
@@ -2875,8 +2919,21 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
                 let name = entry.name().to_string();
                 let size = entry.size();
                 total_size += size;
+                total_compressed += entry.compressed_size();
                 let mut data = Vec::new();
                 let data_ok = std::io::copy(&mut entry, &mut data).is_ok();
+                // Nested archive detection
+                if data_ok && data.len() >= 4 {
+                    let is_archive = (data[..4] == *b"PK\x03\x04")
+                        || (data.len() >= 6 && data[..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
+                        || (data.starts_with(b"Rar!"))
+                        || (data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b)
+                        || (data.starts_with(b"BZ"))
+                        || (data.len() >= 6 && data[0] == 0xfd && data[1..6] == [0x37, 0x7a, 0x58, 0x5a, 0x00]);
+                    if is_archive {
+                        total_nested_archives += 1;
+                    }
+                }
                 let (md5, sha1, sha256, entropy, magic_match, detected, expected) = if data_ok {
                     compute_analysis(&data, &name)
                 } else {
@@ -2911,6 +2968,9 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
                 "zst" => Box::new(zstd::stream::Decoder::new(file).map_err(|e| format!("Zstd: {}", e))?),
                 _ => Box::new(file),
             };
+            if let Ok(meta) = std::fs::metadata(path) {
+                total_compressed = meta.len();
+            }
             let mut archive = tar::Archive::new(reader);
             for entry in archive.entries().map_err(|e| e.to_string())? {
                 let mut entry = entry.map_err(|e| e.to_string())?;
@@ -2919,6 +2979,18 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
                 total_size += size;
                 let mut data = Vec::new();
                 let data_ok = std::io::copy(&mut entry, &mut data).is_ok();
+                // Nested archive detection
+                if data_ok && data.len() >= 4 {
+                    let is_archive = (data[..4] == *b"PK\x03\x04")
+                        || (data.len() >= 6 && data[..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
+                        || (data.starts_with(b"Rar!"))
+                        || (data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b)
+                        || (data.starts_with(b"BZ"))
+                        || (data.len() >= 6 && data[0] == 0xfd && data[1..6] == [0x37, 0x7a, 0x58, 0x5a, 0x00]);
+                    if is_archive {
+                        total_nested_archives += 1;
+                    }
+                }
                 let (md5, sha1, sha256, entropy, magic_match, detected, expected) = if data_ok {
                     compute_analysis(&data, &name)
                 } else {
@@ -2946,6 +3018,15 @@ fn generate_forensic_report_mock(path: &str, pw: Option<&str>) -> Result<crate::
         }
         _ => return Err("Forensic report supports ZIP and TAR formats only".into()),
     }
+
+    // ── Archive-Level Metadata Scan ──
+    let archive_threats = crate::scanner::scan_archive_metadata(
+        all_entries.len(),
+        total_compressed,
+        total_size,
+        total_nested_archives,
+    );
+    all_threats.extend(archive_threats);
 
     let (risk_score, risk_label) = crate::scanner::compute_risk_score(&all_threats);
 
