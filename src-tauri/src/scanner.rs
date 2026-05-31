@@ -102,6 +102,21 @@ pub fn scan_file_content(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
         }
     }
 
+    // 9. Mach-O (Apple executable) detection
+    if is_macho(data) && !is_java_class(data) {
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "suspicious".into(),
+            threat: "MachOExecutable".into(),
+            severity: "medium".into(),
+            detail: "Apple Mach-O executable inside archive — may contain malicious code".into(),
+        });
+    }
+
+    // 10. Image anomaly detection
+    let image_anomaly_threats = check_image_anomaly(name, data);
+    threats.extend(image_anomaly_threats);
+
     threats
 }
 
@@ -288,6 +303,60 @@ pub fn scan_file_name(name: &str) -> Vec<MalwareThreat> {
                 detail: format!("Filename '{}' resembles '{}' — possible brand impersonation", filename_only, brand),
             });
             break;
+        }
+    }
+
+    // Homoglyph Unicode detection — Cyrillic/Greek characters mimicking Latin
+    // Common Cyrillic: а(0x430→a), е(0x435→e), о(0x43E→o), с(0x441→c), р(0x440→p),
+    //                  х(0x445→x), а(0x430→a), і(0x456→i), у(0x443→y)
+    if !filename_only.is_empty() {
+        let has_homoglyph = filename_only.chars().any(|c| {
+            matches!(c,
+                '\u{0430}' | '\u{0435}' | '\u{043E}' | '\u{0441}' | '\u{0440}'
+                | '\u{0445}' | '\u{0456}' | '\u{0443}' | '\u{0432}'
+                | '\u{043C}' | '\u{043D}' | '\u{0442}' | '\u{043A}' | '\u{043B}'
+                | '\u{04BB}' | '\u{04A3}' | '\u{0452}' | '\u{0455}' | '\u{0458}'
+                // Greek homoglyphs
+                | '\u{03BF}' | '\u{03C2}' | '\u{03C3}' | '\u{03C5}' | '\u{03B5}'
+                | '\u{03B7}' | '\u{03B9}' | '\u{03BA}' | '\u{03BD}' | '\u{03C4}'
+                // Armenian
+                | '\u{0561}' | '\u{0565}' | '\u{0578}' | '\u{057D}' | '\u{0583}'
+            )
+        });
+        if has_homoglyph {
+            let display_name: String = filename_only.chars().map(|c| {
+                match c {
+                    '\u{0430}' | '\u{03B1}' => 'a',
+                    '\u{0435}' | '\u{03B5}' => 'e',
+                    '\u{043E}' | '\u{03BF}' => 'o',
+                    '\u{0441}' | '\u{03C2}' | '\u{03C3}' => 'c',
+                    '\u{0440}' => 'p',
+                    '\u{0445}' => 'x',
+                    '\u{0456}' | '\u{03B9}' => 'i',
+                    '\u{0443}' => 'y',
+                    '\u{0432}' => 'b',
+                    '\u{043C}' => 'm',
+                    '\u{043D}' => 'h',
+                    '\u{0442}' => 't',
+                    '\u{043A}' => 'k',
+                    '\u{043B}' => 'n',
+                    '\u{03C5}' => 'u',
+                    '\u{03BA}' => 'k',
+                    '\u{03BD}' => 'n',
+                    '\u{03C4}' => 't',
+                    _ => c,
+                }
+            }).collect();
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "HomoglyphFilename".into(),
+                severity: "medium".into(),
+                detail: format!(
+                    "Filename uses Unicode homoglyphs — looks like '{}' but contains non-Latin characters: {}",
+                    display_name, filename_only
+                ),
+            });
         }
     }
 
@@ -934,6 +1003,129 @@ fn analyze_elf(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
 /// Java .class file detection — magic CAFEBABE
 fn is_java_class(data: &[u8]) -> bool {
     data.len() >= 4 && data[0] == 0xCA && data[1] == 0xFE && data[2] == 0xBA && data[3] == 0xBE
+}
+
+// ─── Mach-O Executable Detection ───
+
+/// Mach-O detection — Apple executable format
+/// FEEDFACE (32-bit), FEEDFACF (64-bit), BEBAFECA (fat binary)
+fn is_macho(data: &[u8]) -> bool {
+    if data.len() < 4 { return false; }
+    let magic32 = data[0] == 0xFE && data[1] == 0xED && data[2] == 0xFA && data[3] == 0xCE;
+    let magic64 = data[0] == 0xFE && data[1] == 0xED && data[2] == 0xFA && data[3] == 0xCF;
+    let magic_fat = data[0] == 0xBE && data[1] == 0xBA && data[2] == 0xFE && data[3] == 0xCA;
+    magic32 || magic64 || magic_fat
+}
+
+// ─── Image Anomaly Detection ───
+
+/// Check if file is likely an image based on extension
+fn likely_image(name: &str) -> bool {
+    let lower = name.to_lowercase();
+    lower.ends_with(".png") || lower.ends_with(".jpg") || lower.ends_with(".jpeg")
+        || lower.ends_with(".gif") || lower.ends_with(".bmp") || lower.ends_with(".webp")
+        || lower.ends_with(".tiff") || lower.ends_with(".tif") || lower.ends_with(".ico")
+}
+
+/// Check for image anomaly — suspicious file size vs image dimensions
+/// Detects steganography payloads hidden in images
+fn check_image_anomaly(name: &str, data: &[u8]) -> Vec<MalwareThreat> {
+    let mut threats = Vec::new();
+    if !likely_image(name) || data.len() < 24 || data.len() > 50_000_000 {
+        return threats;
+    }
+
+    let (width, height) = parse_image_dimensions(data);
+    if width == 0 || height == 0 {
+        return threats; // Can't parse dimensions, skip
+    }
+
+    // Expected size estimate: width * height * 3 bytes (RGB)
+    // Only flag if actual size >> realistic estimate
+    let expected_estimate = (width as u64) * (height as u64) * 3;
+    let actual = data.len() as u64;
+
+    // For very small images, allow some overhead
+    if expected_estimate < 1000 {
+        // Small icon/image — only flag if 10x larger than expected
+        if actual > expected_estimate * 10 && actual > 100_000 {
+            threats.push(MalwareThreat {
+                file: name.to_string(),
+                category: "suspicious".into(),
+                threat: "ImageSizeAnomaly".into(),
+                severity: "medium".into(),
+                detail: format!(
+                    "Image {}x{} px but file size {} — possible steganography payload",
+                    width, height, format_size(actual)
+                ),
+            });
+        }
+    } else if actual > expected_estimate * 5 && actual > 1_000_000 {
+        // Large image, more than 5x expected size
+        threats.push(MalwareThreat {
+            file: name.to_string(),
+            category: "suspicious".into(),
+            threat: "ImageSizeAnomaly".into(),
+            severity: "medium".into(),
+            detail: format!(
+                "Image {}x{} px ({}) but file size {} — likely hidden data appended",
+                width, height, format_size(expected_estimate), format_size(actual)
+            ),
+        });
+    }
+
+    threats
+}
+
+/// Parse image dimensions from PNG or JPEG header
+fn parse_image_dimensions(data: &[u8]) -> (u32, u32) {
+    // PNG: starts with PNG signature, then IHDR chunk at offset 16
+    if data.len() >= 24 && data[0] == 0x89 && data[1] == b'P' && data[2] == b'N' && data[3] == b'G' {
+        // IHDR chunk: width at offset 16 (4 bytes big-endian), height at offset 20
+        let w = u32::from_be_bytes([data[16], data[17], data[18], data[19]]);
+        let h = u32::from_be_bytes([data[20], data[21], data[22], data[23]]);
+        return (w, h);
+    }
+
+    // JPEG: starts with FF D8
+    if data.len() >= 4 && data[0] == 0xFF && data[1] == 0xD8 {
+        // Scan for SOF0 marker (FF C0) or SOF2 (FF C2)
+        // SOF segment: FF Cx, length (2), precision (1), height (2), width (2)
+        let mut pos = 2;
+        while pos + 7 < data.len() {
+            if data[pos] == 0xFF {
+                let marker = data[pos + 1];
+                // SOF0 (0xC0), SOF1 (0xC1), SOF2 (0xC2) = start of frame
+                if marker >= 0xC0 && marker <= 0xC3 {
+                    if pos + 9 < data.len() {
+                        let h = u16::from_be_bytes([data[pos + 5], data[pos + 6]]);
+                        let w = u16::from_be_bytes([data[pos + 7], data[pos + 8]]);
+                        return (w as u32, h as u32);
+                    }
+                    break;
+                }
+                // Skip segment with length
+                if marker != 0xD9 && marker != 0xD8 && pos + 3 < data.len() {
+                    let seg_len = u16::from_be_bytes([data[pos + 2], data[pos + 3]]) as usize;
+                    if seg_len < 2 { break; }
+                    pos += seg_len + 2;
+                } else {
+                    pos += 1;
+                }
+            } else {
+                pos += 1;
+            }
+        }
+    }
+
+    // BMP: starts with 'BM', width/height at offset 18
+    if data.len() >= 26 && data[0] == b'B' && data[1] == b'M' {
+        let w = u32::from_le_bytes([data[18], data[19], data[20], data[21]]);
+        let h = u32::from_le_bytes([data[22], data[23], data[24], data[25]]);
+        return (w, h);
+    }
+
+    (0, 0)
 }
 
 // ─── PDF Threat Detection ───
