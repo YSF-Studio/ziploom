@@ -1,15 +1,15 @@
-/// ZipLoom — Malware Scanner Module
-/// 100% Pure Rust, Zero External Data, Zero Network, Zero Updates Needed
-/// Mendeteksi ancaman berdasarkan ANALISIS STRUKTUR FILE, bukan signature DB.
-///
-/// Strategi deteksi:
-/// 1. PE Executable Analysis — parse header, deteksi suspicious imports/sections
-/// 2. Office Macro Detection — scan VBA project untuk keyword berbahaya
-/// 3. Ransomware Heuristic — deteksi ransom note, encrypted file patterns
-/// 4. General Suspicious — double extension, executable in archive, hidden files
-/// 5. ELF Executable Analysis — parse header, detect suspicious sections/interpreter
-/// 6. Java Class Detection — magic byte CAFEBABE
-/// 7. Archive-Level Heuristics — zip bomb, decompression bomb, file flood, deep nesting
+//! ZipLoom — Malware Scanner Module
+//! 100% Pure Rust, Zero External Data, Zero Network, Zero Updates Needed
+//! Mendeteksi ancaman berdasarkan ANALISIS STRUKTUR FILE, bukan signature DB.
+//!
+//! Strategi deteksi:
+//! 1. PE Executable Analysis — parse header, deteksi suspicious imports/sections
+//! 2. Office Macro Detection — scan VBA project untuk keyword berbahaya
+//! 3. Ransomware Heuristic — deteksi ransom note, encrypted file patterns
+//! 4. General Suspicious — double extension, executable in archive, hidden files
+//! 5. ELF Executable Analysis — parse header, detect suspicious sections/interpreter
+//! 6. Java Class Detection — magic byte CAFEBABE
+//! 7. Archive-Level Heuristics — zip bomb, decompression bomb, file flood, deep nesting
 
 use serde::{Deserialize, Serialize};
 

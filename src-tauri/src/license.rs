@@ -1,12 +1,12 @@
-/// ZipLoom — License Module (Pure Rust, App Store Safe)
-/// Offline Ed25519 signature verification — zero server, zero calls.
-///
-/// HOW IT WORKS:
-/// 1. Binary embeds PUBLIC KEY (Ed25519) — anyone can verify
-/// 2. Master's private key is NEVER in binary — only on Master's machine
-/// 3. License = "ZLV1-" + base64(signature) + "-" + hwid_prefix
-/// 4. Verification is 100% offline — no internet needed
-/// 5. Each license is bound to ONE hardware ID
+//! ZipLoom — License Module (Pure Rust, App Store Safe)
+//! Offline Ed25519 signature verification — zero server, zero calls.
+//!
+//! HOW IT WORKS:
+//! 1. Binary embeds PUBLIC KEY (Ed25519) — anyone can verify
+//! 2. Master's private key is NEVER in binary — only on Master's machine
+//! 3. License = "ZLV1-" + base64(signature) + "-" + hwid_prefix
+//! 4. Verification is 100% offline — no internet needed
+//! 5. Each license is bound to ONE hardware ID
 
 use ed25519_dalek::{Signature, Verifier, VerifyingKey};
 

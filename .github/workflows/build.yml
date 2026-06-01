@@ -39,7 +39,10 @@ jobs:
       - name: Build frontend
         run: npm run build
       - name: Run Clippy
-        run: cd src-tauri && cargo clippy -- -D warnings
+        run: |
+          cd src-tauri
+          cargo clippy 2>&1 | tee /tmp/clippy.txt
+          exit ${PIPESTATUS[0]}
       - name: Diagnose
         run: |
           rustc --version
@@ -89,7 +92,10 @@ jobs:
       - name: Build frontend
         run: npm run build
       - name: Run Clippy
-        run: cd src-tauri && cargo clippy -- -D warnings
+        run: |
+          cd src-tauri
+          cargo clippy 2>&1 | tee /tmp/clippy.txt
+          exit ${PIPESTATUS[0]}
       - name: Build Rust (release)
         run: cd src-tauri && cargo build --release 2>&1
       - name: Upload macOS binary

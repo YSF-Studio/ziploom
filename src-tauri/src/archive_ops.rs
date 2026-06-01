@@ -25,7 +25,7 @@ pub fn formats() -> Vec<ArchiveFormat> {
 fn detect_format_by_magic(path: &str) -> Option<ArchiveFormat> {
     let mut file = std::fs::File::open(path).ok()?;
     let mut magic = [0u8; 8];
-    file.read(&mut magic).ok()?;
+    file.read_exact(&mut magic).ok()?;
     let fmts = formats();
     if magic.starts_with(b"PK\x03\x04") || magic.starts_with(b"PK\x05\x06") || magic.starts_with(b"PK\x07\x08") {
         return fmts.iter().find(|f| f.id == "zip").cloned();
