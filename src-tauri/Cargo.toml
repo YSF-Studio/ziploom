@@ -44,7 +44,7 @@ crc32fast = "1"
 # Ed25519 for offline license verification (pure Rust, App Store safe)
 ed25519-dalek = { version = "2", default-features = false, features = ["alloc"] }
 hex = "0.4"
-rand_core = "0.6"
+rand_core = "0.10"
 	
 # Tauri plugins
 tauri-plugin-single-instance = "2"
