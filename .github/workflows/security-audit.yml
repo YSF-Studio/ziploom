@@ -23,7 +23,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -69,7 +69,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true  # may flag test keys as false positives
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true  # needs network for advisory DB, may rate-limit
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
@@ -95,7 +95,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true  # advisory-only, don't block CI
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
@@ -118,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true  # informational, shouldn't block CI
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
