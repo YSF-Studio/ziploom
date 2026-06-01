@@ -55,10 +55,21 @@
   let colTime = $state(false);
   let colSelect = $state(true);
 
-  onMount(async () => {
-    formats = await invoke("get_formats");
-    await listen("progress", (e) => { progress = e.payload.percent; status = e.payload.status; });
+  onMount(() => {
+    let unlistenProgress;
+    
+    (async () => {
+      formats = await invoke("get_formats");
+      const unlisten = await listen("progress", (e) => { progress = e.payload.percent; status = e.payload.status; });
+      unlistenProgress = unlisten;
+    })();
+    
     document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+    return () => {
+      if (unlistenProgress) unlistenProgress();
+      document.removeEventListener('contextmenu', (e) => e.preventDefault());
+    };
   });
 
   function onDrop(e) {

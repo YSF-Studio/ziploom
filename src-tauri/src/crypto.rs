@@ -174,13 +174,23 @@ pub fn batch_hash(path: String, password: Option<String>) -> Result<Vec<BatchHas
                     archive.by_index(i).map_err(|e| e.to_string())?
                 };
                 let name = entry.name().to_string();
-                let mut data = Vec::new();
-                std::io::copy(&mut entry, &mut data).map_err(|e| e.to_string())?;
-                // Hash small entry data directly (ZIP entries typically small)
-                let md5 = format!("{:x}", md5::Md5::digest(&data));
-                let sha1 = format!("{:x}", sha1::Sha1::digest(&data));
-                let sha256 = format!("{:x}", sha2::Sha256::digest(&data));
-                results.push(BatchHashResult { filename: name, md5, sha1, sha256 });
+                let mut md5_hasher = md5::Md5::new();
+                let mut sha1_hasher = sha1::Sha1::new();
+                let mut sha256_hasher = sha2::Sha256::new();
+                let mut buf = [0u8; 65536];
+                loop {
+                    let n = std::io::Read::read(&mut entry, &mut buf).map_err(|e| e.to_string())?;
+                    if n == 0 { break; }
+                    md5_hasher.update(&buf[..n]);
+                    sha1_hasher.update(&buf[..n]);
+                    sha256_hasher.update(&buf[..n]);
+                }
+                results.push(BatchHashResult {
+                    filename: name,
+                    md5: format!("{:x}", md5_hasher.finalize()),
+                    sha1: format!("{:x}", sha1_hasher.finalize()),
+                    sha256: format!("{:x}", sha256_hasher.finalize())
+                });
             }
         }
         "tar" | "gz" | "bz2" | "xz" | "zst" => {
@@ -196,12 +206,23 @@ pub fn batch_hash(path: String, password: Option<String>) -> Result<Vec<BatchHas
             for entry in archive.entries().map_err(|e| e.to_string())? {
                 let mut entry = entry.map_err(|e| e.to_string())?;
                 let name = entry.path().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
-                let mut data = Vec::new();
-                std::io::copy(&mut entry, &mut data).map_err(|e| e.to_string())?;
-                let md5 = format!("{:x}", md5::Md5::digest(&data));
-                let sha1 = format!("{:x}", sha1::Sha1::digest(&data));
-                let sha256 = format!("{:x}", sha2::Sha256::digest(&data));
-                results.push(BatchHashResult { filename: name, md5, sha1, sha256 });
+                let mut md5_hasher = md5::Md5::new();
+                let mut sha1_hasher = sha1::Sha1::new();
+                let mut sha256_hasher = sha2::Sha256::new();
+                let mut buf = [0u8; 65536];
+                loop {
+                    let n = std::io::Read::read(&mut entry, &mut buf).map_err(|e| e.to_string())?;
+                    if n == 0 { break; }
+                    md5_hasher.update(&buf[..n]);
+                    sha1_hasher.update(&buf[..n]);
+                    sha256_hasher.update(&buf[..n]);
+                }
+                results.push(BatchHashResult {
+                    filename: name,
+                    md5: format!("{:x}", md5_hasher.finalize()),
+                    sha1: format!("{:x}", sha1_hasher.finalize()),
+                    sha256: format!("{:x}", sha256_hasher.finalize())
+                });
             }
         }
         _ => return Err("Batch hash supports ZIP and TAR formats only".into()),

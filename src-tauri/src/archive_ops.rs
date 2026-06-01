@@ -218,8 +218,8 @@ fn do_compress_zip(
                     )
                     .map_err(|e| e.to_string())?;
                 } else {
-                    let data =
-                        std::fs::read(abs_path).map_err(|e| e.to_string())?;
+                    let mut file =
+                        std::fs::File::open(abs_path).map_err(|e| e.to_string())?;
                     let mut opts = FileOptions::<()>::default()
                         .compression_method(method);
                     if method != CompressionMethod::Stored {
@@ -238,12 +238,12 @@ fn do_compress_zip(
 
                     zip.start_file(&rel_path.to_string_lossy(), opts)
                         .map_err(|e| e.to_string())?;
-                    zip.write_all(&data).map_err(|e| e.to_string())?;
+                    std::io::copy(&mut file, &mut zip).map_err(|e| e.to_string())?;
                 }
             }
         } else {
             // Single file
-            let data = std::fs::read(src).map_err(|e| e.to_string())?;
+            let mut file = std::fs::File::open(src).map_err(|e| e.to_string())?;
             let mut opts = FileOptions::<()>::default()
                 .compression_method(method);
             if method != CompressionMethod::Stored {
@@ -261,7 +261,7 @@ fn do_compress_zip(
 
             zip.start_file(&base_name, opts)
                 .map_err(|e| e.to_string())?;
-            zip.write_all(&data).map_err(|e| e.to_string())?;
+            std::io::copy(&mut file, &mut zip).map_err(|e| e.to_string())?;
         }
     }
 
@@ -340,13 +340,14 @@ fn do_compress_tar(
             tar.append_dir_all(&name, src)
                 .map_err(|e| e.to_string())?;
         } else {
-            let data = std::fs::read(src).map_err(|e| e.to_string())?;
+            let mut file = std::fs::File::open(src).map_err(|e| e.to_string())?;
+            let meta = file.metadata().map_err(|e| e.to_string())?;
             let mut header = tar::Header::new_gnu();
-            header.set_size(data.len() as u64);
+            header.set_size(meta.len());
             header.set_mode(file_mode(src));
             header.set_mtime(file_mtime_unix(src));
             let p: &Path = Path::new(&name);
-            tar.append_data(&mut header, p, &data[..])
+            tar.append_data(&mut header, p, &mut file)
                 .map_err(|e| e.to_string())?;
         }
     }
@@ -373,12 +374,13 @@ fn do_compress_zst(
         if src.is_dir() {
             tar.append_dir_all(&name, src).map_err(|e| e.to_string())?;
         } else {
-            let data = std::fs::read(src).map_err(|e| e.to_string())?;
+            let mut file = std::fs::File::open(src).map_err(|e| e.to_string())?;
+            let meta = file.metadata().map_err(|e| e.to_string())?;
             let mut header = tar::Header::new_gnu();
-            header.set_size(data.len() as u64);
+            header.set_size(meta.len());
             header.set_mode(file_mode(src));
             header.set_mtime(file_mtime_unix(src));
-            tar.append_data(&mut header, Path::new(&name), &data[..])
+            tar.append_data(&mut header, Path::new(&name), &mut file)
                 .map_err(|e| e.to_string())?;
         }
     }
@@ -569,6 +571,7 @@ pub async fn compress(
     app: tauri::AppHandle,
     args: CompressArgs,
 ) -> Result<String, String> {
+    // Quick pre-checks (instant, no blocking)
     let fmt = formats()
         .into_iter()
         .find(|f| f.id == args.format)
@@ -576,65 +579,72 @@ pub async fn compress(
     if !fmt.compress {
         return Err("Format not supported for compression".into());
     }
-    let level = args.level.min(9).max(0);
 
-    let _ = app.emit(
-        "progress",
-        ProgressEvent {
-            percent: 0.1,
-            status: "Compressing...".into(),
-        },
-    );
+    // Move heavy blocking work to dedicated thread pool
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        let level = args.level.min(9).max(0);
 
-    let dst = Path::new(&args.destination);
-    let sources: Vec<PathBuf> = args.sources.iter().map(PathBuf::from).collect();
+        let _ = app_clone.emit(
+            "progress",
+            ProgressEvent {
+                percent: 0.1,
+                status: "Compressing...".into(),
+            },
+        );
 
-    if args.clean_meta {
-        let tmp = std::env::temp_dir().join(format!("zl_cl_{}", uuid::Uuid::new_v4()));
-        std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
-        for s in &sources {
-            let dest = tmp.join(s.file_name().ok_or("Invalid path")?);
-            cp_r(s, &dest)?;
-        }
-        crate::filters::clean_metadata(&tmp);
-        let nested: Vec<PathBuf> = collect_dir_entries(&tmp)?;
-        match fmt.id.as_str() {
-            "zip" => do_compress_zip(&nested, dst, args.password.as_deref(), level)?,
-            "zst" => do_compress_zst(&nested, dst, level)?,
-            _ => do_compress_tar(&nested, dst, &fmt.id, level)?,
-        }
-        std::fs::remove_dir_all(&tmp).ok();
-    } else {
-        match fmt.id.as_str() {
-            "zip" => do_compress_zip(&sources, dst, args.password.as_deref(), level)?,
-            "zst" => do_compress_zst(&sources, dst, level)?,
-            _ => do_compress_tar(&sources, dst, &fmt.id, level)?,
-        }
-    }
+        let dst = Path::new(&args.destination);
+        let sources: Vec<PathBuf> = args.sources.iter().map(PathBuf::from).collect();
 
-    // Progress: finalizing
-    let _ = app.emit("progress", ProgressEvent { percent: 0.9, status: "Finalizing...".into() });
-
-    // Split into volumes if requested
-    if let Some(mb) = args.split_size {
-        if mb > 0 {
-            split_file_at(&args.destination, mb)?;
-            let _ = app.emit("progress", ProgressEvent { percent: 0.95, status: "Split complete".into() });
-        }
-    }
-
-    // Auto-checksum if requested
-    if let Some(algo) = &args.checksum_algo {
-        let algos: Vec<&str> = if algo == "auto" { vec!["md5", "sha1", "sha256"] } else { vec![algo.as_str()] };
-        for a in algos {
-            if let Ok(sum) = crate::crypto::calculate_checksum(&args.destination, a) {
-                let _ = app.emit("progress", ProgressEvent { percent: 0.97, status: format!("{}: {}", a.to_uppercase(), sum).into() });
+        if args.clean_meta {
+            let tmp = std::env::temp_dir().join(format!("zl_cl_{}", uuid::Uuid::new_v4()));
+            std::fs::create_dir_all(&tmp).map_err(|e| e.to_string())?;
+            for s in &sources {
+                let dest = tmp.join(s.file_name().ok_or("Invalid path")?);
+                cp_r(s, &dest)?;
+            }
+            crate::filters::clean_metadata(&tmp);
+            let nested: Vec<PathBuf> = collect_dir_entries(&tmp)?;
+            match fmt.id.as_str() {
+                "zip" => do_compress_zip(&nested, dst, args.password.as_deref(), level)?,
+                "zst" => do_compress_zst(&nested, dst, level)?,
+                _ => do_compress_tar(&nested, dst, &fmt.id, level)?,
+            }
+            std::fs::remove_dir_all(&tmp).ok();
+        } else {
+            match fmt.id.as_str() {
+                "zip" => do_compress_zip(&sources, dst, args.password.as_deref(), level)?,
+                "zst" => do_compress_zst(&sources, dst, level)?,
+                _ => do_compress_tar(&sources, dst, &fmt.id, level)?,
             }
         }
-    }
 
-    let _ = app.emit("progress", ProgressEvent { percent: 1.0, status: "Done!".into() });
-    Ok(args.destination)
+        // Progress: finalizing
+        let _ = app_clone.emit("progress", ProgressEvent { percent: 0.9, status: "Finalizing...".into() });
+
+        // Split into volumes if requested
+        if let Some(mb) = args.split_size {
+            if mb > 0 {
+                split_file_at(&args.destination, mb)?;
+                let _ = app_clone.emit("progress", ProgressEvent { percent: 0.95, status: "Split complete".into() });
+            }
+        }
+
+        // Auto-checksum
+        if let Some(algo) = &args.checksum_algo {
+            let algos: Vec<&str> = if algo == "auto" { vec!["md5", "sha1", "sha256"] } else { vec![algo.as_str()] };
+            for a in algos {
+                if let Ok(sum) = crate::crypto::calculate_checksum(&args.destination, a) {
+                    let _ = app_clone.emit("progress", ProgressEvent { percent: 0.97, status: format!("{}: {}", a.to_uppercase(), sum).into() });
+                }
+            }
+        }
+
+        let _ = app_clone.emit("progress", ProgressEvent { percent: 1.0, status: "Done!".into() });
+        Ok(args.destination)
+    })
+    .await
+    .map_err(|e| format!("Task execution failed: {}", e))?
 }
 
 /// Split a compressed file into equal volumes, preserving original extension
@@ -657,64 +667,72 @@ pub async fn extract(
     app: tauri::AppHandle,
     args: ExtractArgs,
 ) -> Result<String, String> {
+    // Quick pre-checks (instant, no blocking)
     let fmt = detect_format(args.source.clone()).ok_or("Unknown archive format")?;
     if !fmt.extract {
         return Err("Extract not supported".into());
     }
-    std::fs::create_dir_all(&args.destination).map_err(|e| e.to_string())?;
 
-    let _ = app.emit(
-        "progress",
-        ProgressEvent {
-            percent: 0.1,
-            status: "Extracting...".into(),
-        },
-    );
-    let dst = Path::new(&args.destination);
+    // Move heavy blocking work to dedicated thread pool
+    let app_clone = app.clone();
+    tokio::task::spawn_blocking(move || {
+        std::fs::create_dir_all(&args.destination).map_err(|e| e.to_string())?;
 
-    let result = match fmt.id.as_str() {
-        "zip" => do_extract_zip(&args.source, dst, args.password.as_deref()),
-        "7z" => do_extract_7z(&args.source, dst, args.password.as_deref()),
-        "rar" => do_extract_rar(&args.source, dst, args.password.as_deref()),
-        "gz" | "bz2" | "xz" | "zst" => {
-            let file =
-                std::fs::File::open(&args.source).map_err(|e| e.to_string())?;
-            let reader: Box<dyn Read> = match fmt.id.as_str() {
-                "gz" => Box::new(flate2::read::GzDecoder::new(file)),
-                "bz2" => Box::new(bzip2::read::BzDecoder::new(file)),
-                "xz" => Box::new(xz2::read::XzDecoder::new(file)),
-                "zst" => Box::new(zstd::stream::Decoder::new(file).map_err(|e| format!("Zstd: {}", e))?),
-                _ => Box::new(file),
-            };
-            do_extract_tar(reader, dst)
+        let _ = app_clone.emit(
+            "progress",
+            ProgressEvent {
+                percent: 0.1,
+                status: "Extracting...".into(),
+            },
+        );
+        let dst = Path::new(&args.destination);
+
+        let result = match fmt.id.as_str() {
+            "zip" => do_extract_zip(&args.source, dst, args.password.as_deref()),
+            "7z" => do_extract_7z(&args.source, dst, args.password.as_deref()),
+            "rar" => do_extract_rar(&args.source, dst, args.password.as_deref()),
+            "gz" | "bz2" | "xz" | "zst" => {
+                let file =
+                    std::fs::File::open(&args.source).map_err(|e| e.to_string())?;
+                let reader: Box<dyn Read> = match fmt.id.as_str() {
+                    "gz" => Box::new(flate2::read::GzDecoder::new(file)),
+                    "bz2" => Box::new(bzip2::read::BzDecoder::new(file)),
+                    "xz" => Box::new(xz2::read::XzDecoder::new(file)),
+                    "zst" => Box::new(zstd::stream::Decoder::new(file).map_err(|e| format!("Zstd: {}", e))?),
+                    _ => Box::new(file),
+                };
+                do_extract_tar(reader, dst)
+            }
+            "tar" => {
+                let file =
+                    std::fs::File::open(&args.source).map_err(|e| e.to_string())?;
+                do_extract_tar(file, dst)
+            }
+            _ => Err("Unsupported format".into()),
+        };
+
+        // Handle password errors
+        if let Err(ref e) = result {
+            if is_password_error(e) {
+                return Err("PASSWORD_NEEDED".into());
+            }
+            return Err(format!("Extraction failed: {}", e));
         }
-        "tar" => {
-            let file =
-                std::fs::File::open(&args.source).map_err(|e| e.to_string())?;
-            do_extract_tar(file, dst)
-        }
-        _ => Err("Unsupported format".into()),
-    };
 
-    // Handle password errors
-    if let Err(ref e) = result {
-        if is_password_error(e) {
-            return Err("PASSWORD_NEEDED".into());
+        if args.clean_meta {
+            crate::filters::clean_metadata(&args.destination.clone().into());
         }
-        return Err(format!("Extraction failed: {}", e));
-    }
-
-    if args.clean_meta {
-        crate::filters::clean_metadata(&args.destination.clone().into());
-    }
-    let _ = app.emit(
-        "progress",
-        ProgressEvent {
-            percent: 1.0,
-            status: "Done!".into(),
-        },
-    );
-    Ok(args.destination)
+        let _ = app_clone.emit(
+            "progress",
+            ProgressEvent {
+                percent: 1.0,
+                status: "Done!".into(),
+            },
+        );
+        Ok(args.destination)
+    })
+    .await
+    .map_err(|e| format!("Task execution failed: {}", e))?
 }
 
 #[tauri::command]
@@ -755,6 +773,7 @@ pub async fn update_archive(
         return Err("Format does not support updates".into());
     }
 
+    tokio::task::spawn_blocking(move || {
     // For ZIP: we can append files
     if fmt.id == "zip" {
         let file = std::fs::OpenOptions::new()
@@ -815,6 +834,9 @@ pub async fn update_archive(
     } else {
         Err("Update only supported for ZIP format".into())
     }
+    })
+    .await
+    .map_err(|e| format!("Task execution failed: {}", e))?
 }
 
 pub fn read_tree(path: &str) -> Result<Vec<String>, String> {
@@ -1306,6 +1328,68 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
                 total_size += size;
                 total_compressed += entry.compressed_size();
 
+                // Large file (>10MB): streaming analysis only (hash + entropy, no content scan)
+                const STREAM_LIMIT: u64 = 10 * 1024 * 1024;
+                if size > STREAM_LIMIT {
+                    use sha2::{Digest as Sha2Digest};
+                    let mut md5_h = md5::Md5::new();
+                    let mut sha1_h = sha1::Sha1::new();
+                    let mut sha256_h = sha2::Sha256::new();
+                    let mut freq = [0u64; 256];
+                    let mut total_read = 0u64;
+                    let mut first_bytes = Vec::new();
+                    let mut buf = [0u8; 65536];
+                    loop {
+                        let n = std::io::Read::read(&mut entry, &mut buf).map_err(|e| e.to_string())?;
+                        if n == 0 { break; }
+                        md5_h.update(&buf[..n]);
+                        sha1_h.update(&buf[..n]);
+                        sha256_h.update(&buf[..n]);
+                        for &b in &buf[..n] { freq[b as usize] += 1; }
+                        total_read += n as u64;
+                        if first_bytes.len() < 20 { first_bytes.extend_from_slice(&buf[..n.min(20 - first_bytes.len())]); }
+                    }
+                    // Nested archive detection from first bytes
+                    if first_bytes.len() >= 4 {
+                        let is_archive = (first_bytes.len() >= 4 && first_bytes[..4] == [0x50, 0x4b, 0x03, 0x04])
+                            || (first_bytes.len() >= 6 && first_bytes[..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
+                            || (first_bytes.starts_with(b"Rar!"))
+                            || (first_bytes.len() >= 2 && first_bytes[0] == 0x1f && first_bytes[1] == 0x8b)
+                            || (first_bytes.starts_with(b"BZ"))
+                            || (first_bytes.len() >= 6 && first_bytes[0] == 0xfd && first_bytes[1..6] == [0x37, 0x7a, 0x58, 0x5a, 0x00]);
+                        if is_archive { total_nested_archives += 1; }
+                    }
+                    let entropy_val = if total_read > 0 {
+                        let len = total_read as f64;
+                        let mut e = 0.0;
+                        for &count in &freq {
+                            if count > 0 { let p = count as f64 / len; e -= p * p.log2(); }
+                        }
+                        Some(e)
+                    } else { Some(0.0) };
+                    let (magic_match, detected, expected) = check_magic_bytes(&first_bytes, &name);
+                    let md5 = Some(format!("{:x}", md5_h.finalize()));
+                    let sha1 = Some(format!("{:x}", sha1_h.finalize()));
+                    let sha256 = Some(format!("{:x}", sha256_h.finalize()));
+
+                    // Content scan skipped for large files — note in anomalies
+                    anomalies.push(crate::Anomaly {
+                        file: name.clone(),
+                        issue: format!("File too large ({} bytes) — content scan skipped", size),
+                        severity: "low".into(),
+                    });
+
+                    all_entries.push(crate::FileEntry {
+                        path: name.clone(), size, compressed_size: None, ratio: None,
+                        is_dir: entry.is_dir(), modified: None, created: None, permissions: None,
+                        md5, sha1, sha256, entropy: entropy_val, magic_match, expected_type: expected, detected_type: detected,
+                    });
+                    // File name scan still runs
+                    all_threats.extend(crate::scanner::scan_file_name(&name));
+                    continue;
+                }
+
+                // Small/medium file: full analysis (current behavior)
                 let mut data = Vec::new();
                 let data_ok = std::io::copy(&mut entry, &mut data).is_ok();
 
@@ -1392,6 +1476,47 @@ pub fn generate_forensic_report(path: String, password: Option<String>) -> Resul
                     if let Some(dt) = datetime_from_unix(secs) { dt } else { format!("{}", secs) }
                 });
                 let permissions = header.mode().ok().map(|m| format!("{:o}", m));
+
+                // Large file (>10MB): streaming analysis only (hash + entropy, no content scan)
+                const STREAM_LIMIT: u64 = 10 * 1024 * 1024;
+                if size > STREAM_LIMIT {
+                    use sha2::{Digest as Sha2Digest};
+                    let mut md5_h = md5::Md5::new();
+                    let mut sha1_h = sha1::Sha1::new();
+                    let mut sha256_h = sha2::Sha256::new();
+                    let mut freq = [0u64; 256];
+                    let mut total_read = 0u64;
+                    let mut first_bytes = Vec::new();
+                    let mut buf = [0u8; 65536];
+                    loop {
+                        let n = std::io::Read::read(&mut entry, &mut buf).map_err(|e| e.to_string())?;
+                        if n == 0 { break; }
+                        md5_h.update(&buf[..n]); sha1_h.update(&buf[..n]); sha256_h.update(&buf[..n]);
+                        for &b in &buf[..n] { freq[b as usize] += 1; }
+                        total_read += n as u64;
+                        if first_bytes.len() < 20 { first_bytes.extend_from_slice(&buf[..n.min(20 - first_bytes.len())]); }
+                    }
+                    if first_bytes.len() >= 4 {
+                        let is_archive = (first_bytes.len() >= 4 && first_bytes[..4] == [0x50, 0x4b, 0x03, 0x04])
+                            || (first_bytes.len() >= 6 && first_bytes[..6] == [0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c])
+                            || (first_bytes.starts_with(b"Rar!")) || (first_bytes.len() >= 2 && first_bytes[0] == 0x1f && first_bytes[1] == 0x8b)
+                            || (first_bytes.starts_with(b"BZ")) || (first_bytes.len() >= 6 && first_bytes[0] == 0xfd && first_bytes[1..6] == [0x37, 0x7a, 0x58, 0x5a, 0x00]);
+                        if is_archive { total_nested_archives += 1; }
+                    }
+                    let entropy_val = if total_read > 0 {
+                        let len = total_read as f64; let mut e = 0.0;
+                        for &count in &freq { if count > 0 { let p = count as f64 / len; e -= p * p.log2(); } }
+                        Some(e)
+                    } else { Some(0.0) };
+                    let (magic_match, detected, expected) = check_magic_bytes(&first_bytes, &name);
+                    let md5 = Some(format!("{:x}", md5_h.finalize()));
+                    let sha1 = Some(format!("{:x}", sha1_h.finalize()));
+                    let sha256 = Some(format!("{:x}", sha256_h.finalize()));
+                    anomalies.push(crate::Anomaly { file: name.clone(), issue: format!("File too large ({} bytes) - content scan skipped", size), severity: "low".into() });
+                    all_entries.push(crate::FileEntry { path: name.clone(), size, compressed_size: None, ratio: None, is_dir, modified, created: None, permissions, md5, sha1, sha256, entropy: entropy_val, magic_match, expected_type: expected, detected_type: detected });
+                    all_threats.extend(crate::scanner::scan_file_name(&name));
+                    continue;
+                }
 
                 let mut data = Vec::new();
                 let data_ok = std::io::copy(&mut entry, &mut data).is_ok();
