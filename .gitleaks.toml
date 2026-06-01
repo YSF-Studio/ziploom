@@ -1,0 +1,18 @@
+# Gitleaks configuration for ZipLoom
+# https://github.com/gitleaks/gitleaks
+
+[allowlist]
+  description = "Known false positives in ZipLoom codebase"
+
+  # Test/development Ed25519 keys in license.rs — these are intentionally public
+  # test vectors, NOT production secrets
+  [[allowlist.regexes]]
+  regex = '''PUBLIC_KEY_BYTES|PRIVATE_KEY_BYTES|secret_bytes|test_key|TESTNET'''
+
+  # UUID patterns that look like random strings but aren't secrets
+  [[allowlist.regexes]]
+  regex = '''[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'''
+
+  # Example API keys in documentation
+  [[allowlist.regexes]]
+  regex = '''example\.(com|org)|your-api-key|placeholder|YOUR_TOKEN'''
