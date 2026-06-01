@@ -33,7 +33,7 @@ fn forensic_password_correct_loads_entries() {
         source: zip_path.to_string_lossy().to_string(),
         password: None,
     };
-    let result = ziploom_tauri_lib::archive_ops::forensic_load(args);
+    let result = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password);
     assert!(result.is_err(), "Should fail without password");
     assert_eq!(result.unwrap_err(), "PASSWORD_NEEDED", "Should say PASSWORD_NEEDED");
 
@@ -42,7 +42,7 @@ fn forensic_password_correct_loads_entries() {
         source: zip_path.to_string_lossy().to_string(),
         password: Some(pw.to_string()),
     };
-    let result = ziploom_tauri_lib::archive_ops::forensic_load(args);
+    let result = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password);
     assert!(result.is_ok(), "Should succeed with correct password: {:?}", result.err());
     let entries = result.unwrap();
     assert_eq!(entries.len(), 2, "Should have 2 entries");
@@ -54,7 +54,7 @@ fn forensic_password_correct_loads_entries() {
         source: zip_path.to_string_lossy().to_string(),
         password: Some("wrongpassword".to_string()),
     };
-    let result = ziploom_tauri_lib::archive_ops::forensic_load(args);
+    let result = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password);
     assert!(result.is_err(), "Should fail with wrong password");
     assert_eq!(result.unwrap_err(), "PASSWORD_NEEDED", "Should say PASSWORD_NEEDED for wrong PW");
 

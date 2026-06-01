@@ -991,10 +991,10 @@ fn hash_all_files_in_zip(path: &str, password: Option<&str>) -> Result<Vec<(Stri
 
 /// Forensic Load — Parse archive and return file list with metadata
 #[tauri::command]
-pub fn forensic_load(args: crate::ForensicLoadArgs) -> Result<Vec<crate::FileEntry>, String> {
-    let fmt = detect_format(args.source.clone()).ok_or("Unknown format")?;
-    let path = &args.source;
-    let pw = args.password.as_deref();
+pub fn forensic_load(source: String, password: Option<String>) -> Result<Vec<crate::FileEntry>, String> {
+    let fmt = detect_format(source.clone()).ok_or("Unknown format")?;
+    let path = &source;
+    let pw = password.as_deref();
 
     match fmt.id.as_str() {
         "zip" => forensic_load_zip(path, pw),
@@ -1205,20 +1205,25 @@ fn forensic_load_zip(path: &str, password: Option<&str>) -> Result<Vec<crate::Fi
 
 /// Selective Extract — extract specific files from archive
 #[tauri::command]
-pub fn selective_extract(args: crate::SelectiveExtractArgs) -> Result<String, String> {
-    let fmt = detect_format(args.source.clone()).ok_or("Unknown format")?;
-    let dst = std::path::Path::new(&args.destination);
+pub fn selective_extract(
+    source: String,
+    password: Option<String>,
+    files: Vec<String>,
+    destination: String,
+) -> Result<String, String> {
+    let fmt = detect_format(source.clone()).ok_or("Unknown format")?;
+    let dst = std::path::Path::new(&destination);
     std::fs::create_dir_all(dst).map_err(|e| e.to_string())?;
 
     match fmt.id.as_str() {
         "zip" => {
-            let file = std::fs::File::open(&args.source).map_err(|e| e.to_string())?;
+            let file = std::fs::File::open(&source).map_err(|e| e.to_string())?;
             let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Invalid ZIP: {}", e))?;
 
             for i in 0..archive.len() {
                 let entry_name = archive.by_index(i).map_err(|e| e.to_string())?.name().to_string();
-                if args.files.contains(&entry_name) {
-                    let mut entry = if let Some(ref pw) = args.password {
+                if files.contains(&entry_name) {
+                    let mut entry = if let Some(ref pw) = password {
                         archive.by_index_decrypt(i, pw.as_bytes()).map_err(|e| format!("Decrypt: {}", e))?
                     } else {
                         archive.by_index(i).map_err(|e| e.to_string())?
@@ -1232,7 +1237,7 @@ pub fn selective_extract(args: crate::SelectiveExtractArgs) -> Result<String, St
                     std::io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
                 }
             }
-            Ok(format!("✅ Extracted {} files to {}", args.files.len(), args.destination))
+            Ok(format!("✅ Extracted {} files to {}", files.len(), destination))
         }
         _ => Err("Selective extract supports ZIP only".into()),
     }

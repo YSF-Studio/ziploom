@@ -40,7 +40,7 @@ fn forensic_docx_as_zip_works() {
         source: docx_path.to_string_lossy().to_string(),
         password: None,
     };
-    let result = ziploom_tauri_lib::archive_ops::forensic_load(args);
+    let result = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password);
     assert!(result.is_ok(), "Should load .docx entries: {:?}", result.err());
     let entries = result.unwrap();
     assert_eq!(entries.len(), 3, "Should have 3 entries, got: {:?}", entries.iter().map(|e| &e.path).collect::<Vec<_>>());
@@ -79,7 +79,7 @@ fn forensic_xlsx_as_zip_works() {
         source: xlsx_path.to_string_lossy().to_string(),
         password: None,
     };
-    let entries = ziploom_tauri_lib::archive_ops::forensic_load(args).unwrap();
+    let entries = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password).unwrap();
     assert_eq!(entries.len(), 2);
     println!("✅ .xlsx forensic: 2 entries loaded");
 
@@ -104,7 +104,7 @@ fn forensic_empty_zip_does_not_crash() {
         source: zip_path.to_string_lossy().to_string(),
         password: None,
     };
-    let result = ziploom_tauri_lib::archive_ops::forensic_load(args);
+    let result = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password);
     assert!(result.is_ok(), "Empty ZIP should not crash: {:?}", result.err());
     let entries = result.unwrap();
     assert_eq!(entries.len(), 0, "Empty ZIP should have 0 entries");
@@ -154,7 +154,7 @@ fn forensic_mixed_content_zip() {
         source: zip_path.to_string_lossy().to_string(),
         password: None,
     };
-    let entries = ziploom_tauri_lib::archive_ops::forensic_load(args).unwrap();
+    let entries = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password).unwrap();
     assert_eq!(entries.len(), 5, "Should have 5 entries, got: {:?}",
         entries.iter().map(|e| &e.path).collect::<Vec<_>>());
     
@@ -193,7 +193,7 @@ fn forensic_stored_not_deflated_zip() {
         source: zip_path.to_string_lossy().to_string(),
         password: None,
     };
-    let entries = ziploom_tauri_lib::archive_ops::forensic_load(args).unwrap();
+    let entries = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password).unwrap();
     assert_eq!(entries.len(), 2, "Stored ZIP should have 2 entries");
     assert_eq!(entries[0].size, 34); // "This file is NOT compressed at all" = 34 bytes
     println!("✅ Stored ZIP: 2 entries, sizes correct");
@@ -214,7 +214,7 @@ fn forensic_corrupted_zip_handled() {
         source: zip_path.to_string_lossy().to_string(),
         password: None,
     };
-    let result = ziploom_tauri_lib::archive_ops::forensic_load(args);
+    let result = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password);
     // Should error gracefully, NOT crash
     assert!(result.is_err(), "Corrupted ZIP should produce an error");
     println!("✅ Corrupted ZIP: error handled gracefully: {}", result.unwrap_err());
@@ -228,7 +228,7 @@ fn forensic_nonexistent_file() {
         source: "/tmp/definitely_does_not_exist_xyz.zip".to_string(),
         password: None,
     };
-    let result = ziploom_tauri_lib::archive_ops::forensic_load(args);
+    let result = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password);
     assert!(result.is_err(), "Nonexistent file should error");
     println!("✅ Nonexistent file: error handled");
 
@@ -258,7 +258,7 @@ fn forensic_large_number_of_entries() {
         source: zip_path.to_string_lossy().to_string(),
         password: None,
     };
-    let entries = ziploom_tauri_lib::archive_ops::forensic_load(args).unwrap();
+    let entries = ziploom_tauri_lib::archive_ops::forensic_load(args.source, args.password).unwrap();
     assert_eq!(entries.len(), 100, "Should have 100 entries");
     println!("✅ 100-entry ZIP: all {} loaded", entries.len());
 
