@@ -33,7 +33,7 @@ bzip2 = { version = "0.5", features = ["libbz2-rs-sys"] }
 xz2 = "0.1"
 zstd = { version = "0.13", default-features = false, features = ["zstdmt"] }
 sevenz-rust = { version = "0.6", features = ["aes256"] }
-unrar = "0.4"
+unrar = "0.5"
 
 # Pure Rust checksum
 sha2 = "0.10"
