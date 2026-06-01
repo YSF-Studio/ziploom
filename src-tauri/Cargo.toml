@@ -38,7 +38,7 @@ unrar = "0.4"
 # Pure Rust checksum
 sha2 = "0.10"
 sha1 = "0.10"
-md-5 = "0.10"
+md-5 = "0.11"
 crc32fast = "1"
 
 # Ed25519 for offline license verification (pure Rust, App Store safe)
