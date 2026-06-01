@@ -59,14 +59,14 @@ jobs:
           cat /tmp/test_output.txt
       - name: Upload test log on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-test-log
           path: /tmp/test_output.txt
       - name: Build Rust (release)
         run: cd src-tauri && cargo build --release 2>&1
       - name: Upload Linux binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: success()
         with:
           name: ziploom-linux
@@ -93,7 +93,7 @@ jobs:
       - name: Build Rust (release)
         run: cd src-tauri && cargo build --release 2>&1
       - name: Upload macOS binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: success()
         with:
           name: ziploom-macos
@@ -132,7 +132,7 @@ jobs:
           Pop-Location
       - name: Upload Windows build log
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-build-log
           path: ${{ runner.temp }}\win_build.txt
@@ -146,7 +146,7 @@ jobs:
           '```' | Add-Content $env:GITHUB_STEP_SUMMARY
       - name: Upload Windows binary
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ziploom-windows
           path: src-tauri/target/release/ziploom-tauri.exe
@@ -179,12 +179,12 @@ jobs:
       - name: Build Tauri bundles
         run: npm run tauri -- build --bundles deb,appimage 2>&1
       - name: Upload .deb
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ziploom-deb
           path: src-tauri/target/release/bundle/deb/*.deb
       - name: Upload .AppImage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ziploom-appimage
           path: src-tauri/target/release/bundle/appimage/*.AppImage
