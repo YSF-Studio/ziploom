@@ -1697,6 +1697,7 @@ mod tests {
         (entries, dir)
     }
 
+    #[allow(dead_code)]
     fn all_paths(dir: &Path) -> Vec<PathBuf> {
         let mut paths = Vec::new();
         for entry in std::fs::read_dir(dir).unwrap() {
