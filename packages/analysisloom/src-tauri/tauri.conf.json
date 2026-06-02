@@ -10,7 +10,15 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "windows": [{ "title": "AnalysisLoom", "width": 1280, "height": 850, "resizable": true }],
+    "windows": [{
+      "title": "AnalysisLoom",
+      "width": 1400,
+      "height": 900,
+      "resizable": true,
+      "decorations": false,
+      "titleBarStyle": "Overlay",
+      "hiddenTitle": true
+    }],
     "security": { "csp": null }
   },
   "plugins": {

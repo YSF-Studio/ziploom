@@ -73,7 +73,6 @@ pub fn capture_ram(tool: String, output: String, compress: bool) -> Result<Strin
         "WinPmem" => ram::capture_winpmem(&output),
         "MRS" => ram::capture_mrs(&output),
         "LiME" => {
-            use std::process::Command;
             // LiME requires sudo + insmod — use avml as fallback
             ram::capture_avml(&output, compress)
         }
@@ -187,4 +186,27 @@ pub fn generate_coc_report(evidence_id: String) -> Result<String, String> {
     })?;
     std::fs::write(&report_path, pdf).map_err(|e| e.to_string())?;
     Ok(report_path)
+}
+
+#[tauri::command]
+pub fn about_info() -> serde_json::Value {
+    serde_json::json!({
+        "appName": "CollectionLoom",
+        "version": "0.1.0",
+        "developer": "YSF Studio — Built with ❤️ by Yusuf Shalahuddin",
+        "build": "Master Build — All Features Unlocked",
+        "features": [
+            "ISO 27037 Forensic Acquisition & Collection",
+            "ISO 17025 Quality Control & Tool Validation",
+            "Write Blocker — Hardware & Software Protection",
+            "100% Offline — Zero Data Collection. All processing runs locally.",
+            "Bit-for-bit Disk Imaging with SHA-256 Verification",
+            "RAM Capture, Mobile Triage (ADB/iOS), Cloud Acquisition",
+            "Network Packet Capture & Encryption Detection",
+            "End-to-End Chain of Custody with PDF Reporting"
+        ],
+        "disclaimer": "This software is provided 'AS-IS'. Results should be independently verified before use in legal proceedings.",
+        "offline": true,
+        "privacy": "100% offline — zero data collection. No telemetry, no analytics, no external network calls."
+    })
 }

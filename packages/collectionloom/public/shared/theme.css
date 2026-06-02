@@ -1,0 +1,207 @@
+/* YSF Studio — Shared Design System */
+/* Forensic Suite: AnalysisLoom · CollectionLoom · ZipLoom */
+
+:root {
+  /* Surfaces */
+  --bg: #0a0a0a;
+  --card: #141414;
+  --card-hover: #1a1a1a;
+  --card-active: #1a1a2e;
+  --border: #2a2a2a;
+  --border-light: #333;
+  --border-active: #3b82f6;
+
+  /* Semantic */
+  --primary: #3b82f6;
+  --primary-bg: rgba(59,130,246,0.12);
+  --primary-hover: rgba(59,130,246,0.20);
+  --success: #22c55e;
+  --success-bg: rgba(34,197,94,0.15);
+  --danger: #ef4444;
+  --danger-bg: rgba(239,68,68,0.15);
+  --warn: #f59e0b;
+  --warn-bg: rgba(245,158,11,0.15);
+
+  /* Typography */
+  --text: #e0e0e0;
+  --text-secondary: #86868b;
+  --text-muted: #555;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --mono: "SF Mono", "Menlo", "Cascadia Code", "JetBrains Mono", monospace;
+
+  /* Spacing */
+  --radius: 8px;
+  --radius-sm: 4px;
+  --radius-lg: 12px;
+
+  /* Density */
+  --row-compact: 24px;
+  --row-standard: 32px;
+  --row-comfortable: 44px;
+
+  /* Layout */
+  --titlebar-h: 40px;
+  --statusbar-h: 28px;
+
+  /* App identity */
+  --app-analysis: #3b82f6;
+  --app-collection: #22c55e;
+  --app-zip: #f59e0b;
+}
+
+/* Reset */
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  font-family: var(--font);
+  background: var(--bg); color: var(--text);
+  overflow: hidden; height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+/* Input base */
+input, textarea, select {
+  background: #1a1a1a; color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 8px 12px; font-size: 13px; outline: none;
+  transition: border-color 0.15s;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--primary);
+}
+
+/* Buttons */
+.btn {
+  padding: 6px 14px; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--card);
+  color: var(--text-secondary); cursor: pointer;
+  font-size: 12px; font-weight: 500;
+  transition: all 0.15s; display: inline-flex; align-items: center; gap: 6px;
+}
+.btn:hover { color: var(--text); background: var(--card-hover); }
+.btn-primary {
+  background: var(--primary); color: white; border: none;
+  padding: 8px 18px; font-weight: 600; font-size: 13px;
+}
+.btn-primary:hover { opacity: 0.9; }
+.btn-primary:disabled { opacity: 0.4; cursor: default; }
+.btn-ghost { background: transparent; border: none; color: var(--text-secondary); }
+.btn-ghost:hover { color: var(--text); }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
+
+/* Animations */
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.spinner { display: inline-block; animation: spin 1s linear infinite; }
+
+/* macOS Traffic Lights */
+.traffic-lights { display: flex; gap: 6px; -webkit-app-region: no-drag; }
+.traffic-lights .tl { width: 12px; height: 12px; border-radius: 50%; }
+.traffic-lights .tl.red { background: #ff5f57; }
+.traffic-lights .tl.yellow { background: #ffbd2e; }
+.traffic-lights .tl.green { background: #28c840; }
+
+/* App Shell */
+.app-shell {
+  display: flex; flex-direction: column; height: 100vh; overflow: hidden;
+}
+
+/* Title Bar */
+.titlebar {
+  display: flex; align-items: center; padding: 0 12px;
+  height: var(--titlebar-h); background: var(--card);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag; gap: 12px;
+}
+.titlebar .logo { width: 22px; height: 22px; border-radius: var(--radius-sm); -webkit-app-region: no-drag; }
+.titlebar .title { font-size: 13px; font-weight: 600; color: var(--text); margin-right: 4px; -webkit-app-region: no-drag; }
+.titlebar .version { font-size: 10px; color: var(--text-muted); -webkit-app-region: no-drag; }
+
+/* Tab Strip */
+.tabstrip {
+  display: flex; gap: 1px; flex: 1; justify-content: center;
+  -webkit-app-region: no-drag;
+}
+.tabstrip button {
+  padding: 4px 14px; background: transparent; color: var(--text-secondary);
+  border: none; border-radius: 6px; cursor: pointer;
+  font-size: 12px; height: 28px; transition: all 0.15s;
+  white-space: nowrap;
+}
+.tabstrip button:hover { color: var(--text); background: var(--card-hover); }
+.tabstrip button.active { color: var(--primary); background: var(--primary-bg); font-weight: 600; }
+.tabstrip button.active::after { content: ''; display: block; height: 2px; background: var(--primary); margin-top: 4px; border-radius: 1px; }
+
+/* Titlebar end */
+.titlebar-end { display: flex; gap: 6px; -webkit-app-region: no-drag; align-items: center; }
+
+/* Workspace */
+.workspace { flex: 1; display: flex; overflow: hidden; }
+.workspace-main { flex: 1; overflow-y: auto; padding: 16px; overflow-x: hidden; }
+
+/* Inspector panel */
+.inspector-panel {
+  width: 280px; min-width: 280px; background: #0d0d0d;
+  border-left: 1px solid var(--border); overflow-y: auto;
+  animation: slideIn 0.2s ease-out;
+}
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* Status Bar */
+.statusbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 12px; height: var(--statusbar-h);
+  background: #0d0d0d; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-secondary);
+}
+.statusbar .sb-left, .statusbar .sb-center, .statusbar .sb-right {
+  display: flex; align-items: center; gap: 8px;
+}
+.statusbar .sb-center { flex: 1; justify-content: center; }
+.statusbar .sb-right { min-width: 100px; justify-content: flex-end; }
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #555; }
+.status-dot.on { background: var(--success); box-shadow: 0 0 4px var(--success); }
+.status-dot.busy { background: var(--warn); animation: pulse 1s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.offline-badge {
+  padding: 1px 8px; background: var(--success-bg); color: var(--success);
+  border-radius: 10px; font-size: 10px; font-weight: 600;
+}
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 48px; right: 20px;
+  padding: 10px 16px; border-radius: var(--radius-lg);
+  background: #1a2e1a; border: 1px solid var(--success);
+  font-size: 13px; max-width: 400px; z-index: 1000;
+  animation: slideUp 0.25s ease-out;
+}
+.toast.error { background: #2e1a1a; border-color: var(--danger); }
+.toast.warn { background: #2e2a1a; border-color: var(--warn); }
+.toast .close-toast {
+  background: none; border: none; color: inherit; cursor: pointer;
+  margin-left: 10px; font-size: 14px; opacity: 0.6;
+}
+.toast .close-toast:hover { opacity: 1; }
+
+/* Empty state */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  height: 200px; color: var(--text-muted); text-align: center; gap: 8px;
+}
+.empty-state .icon { font-size: 36px; opacity: 0.3; }
+.empty-state p { font-size: 13px; margin: 0; }
+
+/* Card style */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 16px 20px;
+}
+.card h3, .card h4 { margin: 0 0 10px; font-size: 14px; color: #ccc; }

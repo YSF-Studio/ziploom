@@ -34,6 +34,7 @@ pub fn run() {
             commands::scan_encryption,
             commands::create_chain_of_custody,
             commands::generate_coc_report,
+            commands::about_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running CollectionLoom");

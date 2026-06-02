@@ -156,3 +156,33 @@ pub fn keyword_search(case_id: String, query: String) -> Result<Vec<SearchResult
 
     Ok(results)
 }
+
+// ─── File Preview ───
+
+#[tauri::command]
+pub fn preview_file(path: String) -> Result<ysf_core::preview::PreviewResult, String> {
+    ysf_core::preview::preview_file(&path)
+}
+
+#[tauri::command]
+pub fn about_info() -> serde_json::Value {
+    serde_json::json!({
+        "appName": "AnalysisLoom",
+        "version": "0.1.0",
+        "developer": "YSF Studio — Built with ❤️ by Yusuf Shalahuddin",
+        "build": "Master Build — All Features Unlocked",
+        "features": [
+            "ISO 27042 Forensic Analysis Workstation",
+            "ISO 17043 Tool Validation & Proficiency Testing",
+            "ISO 17025 Laboratory Competence Compliance",
+            "100% Offline — Zero Data Collection. All processing runs locally.",
+            "End-to-End Chain of Custody with SHA-256 hashing",
+            "NTFS/MFT Parser, File Carving, Timeline Analysis",
+            "Multi-format file preview (text, image, hex, archive)",
+            "SQLite-based Case Management with Audit Trail"
+        ],
+        "disclaimer": "This software is provided 'AS-IS'. Results should be independently verified before use in legal proceedings.",
+        "offline": true,
+        "privacy": "100% offline — zero data collection. No telemetry, no analytics, no external network calls."
+    })
+}

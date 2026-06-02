@@ -27,6 +27,8 @@ pub fn run() {
             commands::cancel_carving,
             commands::get_timeline,
             commands::keyword_search,
+            commands::preview_file,
+            commands::about_info,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AnalysisLoom");

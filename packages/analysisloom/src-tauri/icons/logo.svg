@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <filter id="grain">
+      <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0"/>
+      <feBlend in="SourceGraphic" mode="multiply" result="grain"/>
+    </filter>
+    <filter id="emboss">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="1" result="blur"/>
+      <feSpecularLighting in="blur" surfaceScale="3" specularConstant="0.15" specularExponent="10" result="spec">
+        <fePointLight x="256" y="80" z="200"/>
+      </feSpecularLighting>
+      <feComposite in="spec" in2="SourceAlpha" operator="in" result="spec2"/>
+      <feComposite in="SourceGraphic" in2="spec2" operator="arithmetic" k1="0" k2="1" k3="1" k4="0"/>
+    </filter>
+  </defs>
+
+  <!-- Outer rounded square background -->
+  <rect x="8" y="8" width="496" height="496" rx="72" fill="#0b1f3a" stroke="#2a4a6e" stroke-width="4"/>
+
+  <!-- Shield shape - M & W monogram -->
+  <g transform="translate(40,50)" filter="url(#emboss)">
+    <!-- Shield base -->
+    <path d="M 10,0 L 110,0 L 216,80 L 216,300 L 216,340 L 108,412 L 0,340 L 0,300 L 0,80 Z"
+          fill="#0a0e16" stroke="#3a5a7e" stroke-width="3"/>
+
+    <!-- M & W geometric monogram -->
+    <g fill="#0a0e16" stroke="#4a7a9e" stroke-width="2.5" stroke-linejoin="miter">
+      <!-- Left leg of M -->
+      <polygon points="38,320 72,320 72,120 38,120"/>
+      <!-- Right leg of M -->
+      <polygon points="184,320 178,320 178,120 144,120"/>
+      <!-- M center peak (left diagonal) -->
+      <polygon points="72,120 72,80 108,180 108,120"/>
+      <!-- M center peak (right diagonal) - shared with W -->
+      <polygon points="144,120 108,180 108,120"/>
+      <!-- M center vertical -->
+      <polygon points="98,120 118,120 118,320 98,320"/>
+
+      <!-- W left diagonal from top -->
+      <polygon points="38,140 72,140 72,320 38,320"/>
+      <!-- W center up diagonal -->
+      <polygon points="72,200 72,170 108,280 108,320"/>
+      <!-- W center down diagonal -->
+      <polygon points="108,280 108,320 144,320 144,200"/>
+      <!-- W right diagonal -->
+      <polygon points="144,200 178,200 178,320 144,320"/>
+    </g>
+
+    <!-- Central diamond accent -->
+    <polygon points="108,180 120,210 108,240 96,210" fill="#3a5a7e" stroke="#4a7a9e" stroke-width="1.5"/>
+  </g>
+</svg>

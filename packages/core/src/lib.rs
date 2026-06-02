@@ -17,6 +17,8 @@ pub mod archive;
 pub mod ntfs;
 pub mod carving;
 pub mod report;
+pub mod snapshot;
+pub mod preview;
 
 // Re-export commonly used types
 pub use progress::{ProgressState, CancelFlag, set_cancel_flag, is_cancelled};
