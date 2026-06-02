@@ -1,0 +1,14 @@
+{
+  "name": "ysf-forensic-suite",
+  "private": true,
+  "workspaces": ["packages/collectionloom", "packages/analysisloom", "packages/ziploom"],
+  "scripts": {
+    "dev:collectionloom": "cd packages/collectionloom && npm run tauri dev",
+    "dev:analysisloom": "cd packages/analysisloom && npm run tauri dev",
+    "build:collectionloom": "cd packages/collectionloom && npm run tauri build",
+    "build:analysisloom": "cd packages/analysisloom && npm run tauri build",
+    "test:core": "cd packages/core && cargo test",
+    "test:all": "cd packages/core && cargo test && cd ../collectionloom/src-tauri && cargo test && cd ../../analysisloom/src-tauri && cargo test",
+    "lint": "cd packages/core && cargo clippy"
+  }
+}

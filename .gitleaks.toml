@@ -1,0 +1,8 @@
+[allowlist]
+  description = "Known false positives in project codebase"
+  [[allowlist.regexes]]
+  regex = "PUBLIC_KEY_BYTES|PRIVATE_KEY_BYTES|secret_bytes|test_key|TESTNET"
+  [[allowlist.regexes]]
+  regex = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+  [[allowlist.regexes]]
+  regex = "example\\.(com|org)|your-api-key|placeholder|YOUR_TOKEN"

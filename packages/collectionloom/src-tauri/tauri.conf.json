@@ -1,0 +1,20 @@
+{
+  "$schema": "https://raw.githubusercontent.com/nicedoc/tauri/v2/schema.json",
+  "productName": "CollectionLoom",
+  "identifier": "com.ysf.collectionloom",
+  "version": "0.1.0",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [{ "title": "CollectionLoom", "width": 1200, "height": 800, "resizable": true }],
+    "security": { "csp": null }
+  },
+  "plugins": {
+    "fs": { "scope": { "allow": [{ "path": "$HOME/**" }] } },
+    "shell": { "scope": [{ "name": "run-command", "cmd": "bash", "args": true }] }
+  }
+}

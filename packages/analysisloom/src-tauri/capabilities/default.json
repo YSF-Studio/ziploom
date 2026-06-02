@@ -1,0 +1,13 @@
+{
+  "identifier": "default",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "fs:allow-read-text-file",
+    "fs:allow-write-text-file",
+    "fs:allow-read-file",
+    "fs:allow-write-file",
+    "dialog:default",
+    { "identifier": "fs:scope", "allow": [{ "path": "$HOME/**" }, { "path": "/mnt/**" }, { "path": "/tmp/**" }] }
+  ]
+}
