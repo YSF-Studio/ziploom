@@ -22,11 +22,11 @@ async function scanNow() {
 </script>
 
 <div>
-  <h3>\ud83d\udd10 Encryption Detection</h3>
+  <h3>🔐 Encryption Detection</h3>
   <p class="desc">Pre-acquisition triage — detects FDE, TPM, and Secure Boot status.</p>
 
   <button onclick={scanNow} class="btn-primary" disabled={busy}>
-    {busy ? "\u23f3 Scanning..." : "\ud83d\udd0d Scan All Drives"}
+    {busy ? "⏳ Scanning..." : "🔍 Scan All Drives"}
   </button>
 
   {#if report}
@@ -47,7 +47,7 @@ async function scanNow() {
 
     {#if report.recommendations?.length}
     <div class="card warn">
-      <h4>\ud83d\udcd6 Recommendations</h4>
+      <h4>📖 Recommendations</h4>
       {#each report.recommendations as rec}
         <p class="rec">\u2022 {rec}</p>
       {/each}

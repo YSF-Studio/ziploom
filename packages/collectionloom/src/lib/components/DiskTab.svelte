@@ -54,7 +54,7 @@ $effect(() => { listDisks(); });
 </script>
 
 <div>
-  <h3>\ud83d\udcc0 Disk Acquisition</h3>
+  <h3>💿 Disk Acquisition</h3>
   
   <div class="row">
     <label>Source Device:
@@ -65,7 +65,7 @@ $effect(() => { listDisks(); });
         {/each}
       </select>
     </label>
-    <button onclick={listDisks} class="btn-sm">\ud83d\udd04 Refresh</button>
+    <button onclick={listDisks} class="btn-sm">🔄 Refresh</button>
   </div>
 
   <div class="row">
@@ -79,9 +79,9 @@ $effect(() => { listDisks(); });
 
   <div class="actions">
     {#if !collBusy}
-      <button onclick={startImaging} class="btn-primary" disabled={!selectedDisk}>\u25b6 Start Collection</button>
+      <button onclick={startImaging} class="btn-primary" disabled={!selectedDisk}>▶️ Start Collection</button>
     {:else}
-      <button onclick={cancelImaging} class="btn-danger">\u25a0 Stop</button>
+      <button onclick={cancelImaging} class="btn-danger">■ Stop</button>
     {/if}
   </div>
 
