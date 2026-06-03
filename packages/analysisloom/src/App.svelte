@@ -5,6 +5,7 @@ import FileBrowserTab from "./lib/components/FileBrowserTab.svelte";
 import CarvingTab from "./lib/components/CarvingTab.svelte";
 import TimelineTab from "./lib/components/TimelineTab.svelte";
 import SearchTab from "./lib/components/SearchTab.svelte";
+import ReportTab from "./lib/components/ReportTab.svelte";
 import DisclaimerTab from "./lib/components/DisclaimerTab.svelte";
 import InspectorPanel from "./lib/components/InspectorPanel.svelte";
 
@@ -39,6 +40,7 @@ const sidebarSections = [
       { id: "timeline", icon: "📊", label: "Timeline" },
       { id: "carving", icon: "🔍", label: "Carved Files" },
       { id: "search", icon: "🔎", label: "Search" },
+      { id: "report", icon: "📄", label: "Report" },
     ]
   },
   {
@@ -125,6 +127,8 @@ function handleSearchSubmit() {
         <CarvingTab bind:activeCase bind:busy bind:msg {timeoutPromise} />
       {:else if activeView === "search"}
         <SearchTab bind:activeCase bind:busy bind:msg {timeoutPromise} />
+      {:else if activeView === "report"}
+        <ReportTab bind:activeCase bind:busy bind:msg {timeoutPromise} />
       {:else if activeView === "about"}
         <DisclaimerTab />
       {/if}

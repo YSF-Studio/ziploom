@@ -28,6 +28,9 @@ pub fn run() {
             commands::get_timeline,
             commands::keyword_search,
             commands::preview_file,
+            commands::generate_case_report,
+            commands::log_action,
+            commands::get_audit_log,
             commands::about_info,
         ])
         .run(tauri::generate_context!())
