@@ -16,20 +16,44 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       app_dir: ${{ steps.detect.outputs.app_dir }}
+      cargo_ws: ${{ steps.detect.outputs.cargo_ws }}
     steps:
       - uses: actions/checkout@v4
       - id: detect
         run: |
-          # Auto-detect which app directory exists (monorepo structure)
+          # Infer app name from repository name (e.g. YSF-Studio/ziploom → ziploom)
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          echo "Repository: $GITHUB_REPOSITORY → app: $REPO_NAME"
+
+          # Check monorepo structure first (packages/<app>/)
+          if [ -f "packages/$REPO_NAME/package.json" ]; then
+            echo "Monorepo mode: packages/$REPO_NAME"
+            echo "app_dir=packages/$REPO_NAME" >> $GITHUB_OUTPUT
+            echo "cargo_ws=packages/$REPO_NAME/src-tauri" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Check standalone structure (root level)
+          if [ -f "src-tauri/Cargo.toml" ]; then
+            echo "Standalone mode: root"
+            echo "app_dir=." >> $GITHUB_OUTPUT
+            echo "cargo_ws=src-tauri" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # Fallback: check any packages/<app>/
           for dir in packages/ziploom packages/collectionloom packages/analysisloom; do
             if [ -f "$dir/package.json" ]; then
-              echo "Detected: $dir"
+              echo "Fallback detected: $dir"
               echo "app_dir=$dir" >> $GITHUB_OUTPUT
+              echo "cargo_ws=$dir/src-tauri" >> $GITHUB_OUTPUT
               exit 0
             fi
           done
+
           echo "app_dir=." >> $GITHUB_OUTPUT
-          echo "Warning: No packages/*/package.json found, using root"
+          echo "cargo_ws=." >> $GITHUB_OUTPUT
+          echo "Warning: No app structure found, using root"
 
   build:
     name: Build (${{ matrix.platform }})
@@ -38,19 +62,18 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
-    defaults:
-      run:
-        working-directory: ${{ needs.detect.outputs.app_dir }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
+        working-directory: ${{ needs.detect.outputs.app_dir }}
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          cache-workspaces: ${{ needs.detect.outputs.cargo_ws }}
 
       - uses: actions/setup-node@v4
         with:
@@ -59,15 +82,19 @@ jobs:
           cache-dependency-path: ${{ needs.detect.outputs.app_dir }}/package-lock.json
 
       - name: Install npm deps
+        working-directory: ${{ needs.detect.outputs.app_dir }}
         run: npm ci
 
       - name: Build Rust
+        working-directory: ${{ needs.detect.outputs.app_dir }}
         run: cargo build --manifest-path src-tauri/Cargo.toml
 
       - name: Test Rust
+        working-directory: ${{ needs.detect.outputs.app_dir }}
         run: cargo test --manifest-path src-tauri/Cargo.toml
 
       - name: Build Frontend
+        working-directory: ${{ needs.detect.outputs.app_dir }}
         run: npm run build
 
   security:

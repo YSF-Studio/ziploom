@@ -32,76 +32,101 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          cache-workspaces: packages/core
       - run: cargo test
 
   ziploom:
     name: 📦 ZipLoom
-    if: hashFiles('packages/ziploom/package.json') != ''
+    if: hashFiles('packages/ziploom/package.json') != '' && endsWith(github.repository, '/ziploom')
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/ziploom
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+          cache-workspaces: packages/ziploom/src-tauri
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
-      - run: cargo build --manifest-path src-tauri/Cargo.toml
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+        working-directory: packages/ziploom
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+      - name: Build Rust
+        working-directory: packages/ziploom
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+      - name: Test Rust
+        working-directory: packages/ziploom
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: packages/ziploom/package-lock.json
-      - run: npm ci
-      - run: npm run build
+      - name: Install npm deps
+        working-directory: packages/ziploom
+        run: npm ci
+      - name: Build Frontend
+        working-directory: packages/ziploom
+        run: npm run build
 
   collectionloom:
     name: 📀 CollectionLoom
-    if: hashFiles('packages/collectionloom/package.json') != ''
+    if: hashFiles('packages/collectionloom/package.json') != '' && endsWith(github.repository, '/collectionloom')
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/collectionloom
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libpcap-dev
+          cache-workspaces: packages/collectionloom/src-tauri
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
-      - run: cargo build --manifest-path src-tauri/Cargo.toml
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+        working-directory: packages/collectionloom
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libpcap-dev
+      - name: Build Rust
+        working-directory: packages/collectionloom
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+      - name: Test Rust
+        working-directory: packages/collectionloom
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: packages/collectionloom/package-lock.json
-      - run: npm ci
-      - run: npm run build
+      - name: Install npm deps
+        working-directory: packages/collectionloom
+        run: npm ci
+      - name: Build Frontend
+        working-directory: packages/collectionloom
+        run: npm run build
 
   analysisloom:
     name: 🔬 AnalysisLoom
-    if: hashFiles('packages/analysisloom/package.json') != ''
+    if: hashFiles('packages/analysisloom/package.json') != '' && endsWith(github.repository, '/analysisloom')
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/analysisloom
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libpcap-dev
+          cache-workspaces: packages/analysisloom/src-tauri
+      - name: Install Linux dependencies
         if: runner.os == 'Linux'
-      - run: cargo build --manifest-path src-tauri/Cargo.toml
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+        working-directory: packages/analysisloom
+        run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libpcap-dev
+      - name: Build Rust
+        working-directory: packages/analysisloom
+        run: cargo build --manifest-path src-tauri/Cargo.toml
+      - name: Test Rust
+        working-directory: packages/analysisloom
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'npm'
           cache-dependency-path: packages/analysisloom/package-lock.json
-      - run: npm ci
-      - run: npm run build
+      - name: Install npm deps
+        working-directory: packages/analysisloom
+        run: npm ci
+      - name: Build Frontend
+        working-directory: packages/analysisloom
+        run: npm run build
