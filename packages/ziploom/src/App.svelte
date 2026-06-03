@@ -2,6 +2,7 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+  import Logo from "./lib/Logo.svelte";
 
   let activeTab = $state(0);
   let msg = $state("");
@@ -21,6 +22,12 @@
   let inspInfo = $state(null);
   let inspError = $state("");
 
+  // ─── Encrypt State ───
+  let encFilePath = $state("");
+  let encPassword = $state("");
+  let encMode = $state("encrypt"); // "encrypt" or "decrypt"
+  let encResult = $state(null);
+
   function timeoutPromise(promise, ms) {
     let timer;
     const timeout = new Promise((_, reject) => {
@@ -34,6 +41,7 @@
     { label: "Extract", icon: "📂" },
     { label: "Inspect", icon: "🔍" },
     { label: "About", icon: "ℹ️" },
+    { label: "Encrypt", icon: "🔐" },
   ];
 
   const formats = [
@@ -70,6 +78,8 @@
     } else if (activeTab === 2) {
       inspArchive = paths[0];
       await doInspect(paths[0]);
+    } else if (activeTab === 4) {
+      encFilePath = paths[0];
     }
   }
 
@@ -198,6 +208,53 @@
     busy = false;
   }
 
+  // ─── Encrypt: Browse File ───
+  async function browseEncFile() {
+    if (busy) return;
+    try {
+      const selected = await open({ directory: false, multiple: false });
+      if (selected) {
+        encFilePath = selected;
+      }
+    } catch (e) {
+      msg = `❌ ${typeof e === 'string' ? e : String(e)}`;
+    }
+  }
+
+  async function doEncrypt() {
+    if (!encFilePath) {
+      msg = "❌ Select a file first";
+      return;
+    }
+    if (!encPassword) {
+      msg = "❌ Enter a password";
+      return;
+    }
+    busy = true;
+    encResult = null;
+    try {
+      const cmd = encMode === "encrypt" ? "encrypt_file" : "decrypt_file";
+      const result = await timeoutPromise(
+        invoke(cmd, { path: encFilePath, password: encPassword }),
+        120000
+      );
+      encResult = result;
+      const action = encMode === "encrypt" ? "Encrypted" : "Decrypted";
+      msg = `✅ ${action}: ${result}`;
+    } catch (e) {
+      const err = typeof e === 'string' ? e : String(e);
+      if (err === "TIMEOUT") msg = `❌ ${encMode === "encrypt" ? "Encryption" : "Decryption"} timed out`;
+      else msg = `❌ ${err}`;
+    }
+    busy = false;
+  }
+
+  function clearEnc() {
+    encFilePath = "";
+    encPassword = "";
+    encResult = null;
+  }
+
   function formatSize(bytes) {
     if (bytes == null) return "—";
     if (bytes < 1024) return `${bytes} B`;
@@ -247,11 +304,27 @@
           } else if (activeTab === 2) {
             inspArchive = paths[0];
             await doInspect(paths[0]);
+          } else if (activeTab === 4) {
+            encFilePath = paths[0];
           }
         }
       }
     });
   });
+
+  // ─── Expose helpers for GUI screenshot mode ───
+  if (typeof window !== 'undefined') {
+    window.__zipLoom = {
+      setTab: (i) => { activeTab = i; msg = ''; },
+      setSources: (paths) => { compSources = paths; },
+      setInspectResult: (data) => { inspInfo = data; inspError = ''; },
+      setExtractResult: (archive) => { extrArchive = archive; },
+      setMsg: (m) => { msg = m; },
+      toggleLight: () => {
+        document.documentElement.classList.toggle('light-mode');
+      },
+    };
+  }
 </script>
 
 <div class="app-shell">
@@ -259,7 +332,7 @@
     <div class="traffic-lights">
       <span class="tl red"></span><span class="tl yellow"></span><span class="tl green"></span>
     </div>
-    <img src="/src-tauri/icons/logo.svg" class="logo" alt="ZipLoom" />
+    <Logo size={22} />
     <span class="title">ZipLoom</span>
     <span class="version">v0.1.0</span>
     <div class="tabstrip">
@@ -457,7 +530,7 @@
       {:else if activeTab === 3}
         <div style="max-width:580px;margin:0 auto">
           <div style="text-align:center;margin-bottom:20px">
-            <img src="/src-tauri/icons/icon.png" style="width:72px;height:72px;border-radius:16px;margin-bottom:8px" alt="ZipLoom" />
+            <img src="/icon.png" style="width:72px;height:72px;border-radius:16px;margin-bottom:8px" alt="ZipLoom" />
             <h3 style="margin:0 0 4px">{aboutInfo.appName}<span style="color:var(--text-muted);font-size:12px;margin-left:8px">v{aboutInfo.version}</span></h3>
             <p style="color:var(--text-secondary);font-size:13px;margin:0">Archive Utility — Fast, Clean, Offline</p>
           </div>
@@ -486,6 +559,84 @@
           <p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:12px">
             YSF Studio © {new Date().getFullYear()} — All rights reserved.
           </p>
+        </div>
+      <!-- ─── ENCRYPT TAB ─── -->
+      {:else if activeTab === 4}
+        <div class="tab-content">
+          <h3>🔐 Encrypt / Decrypt</h3>
+          <p class="subtitle">
+            AES-256-GCM encryption and decryption for individual files. Encrypted files are saved with a .aes256 extension.
+          </p>
+
+          <!-- Mode toggle -->
+          <div class="enc-mode-row">
+            <button class="btn mode-btn" class:active={encMode === 'encrypt'} onclick={() => { encMode = 'encrypt'; encResult = null; }}>
+              🔒 Encrypt
+            </button>
+            <button class="btn mode-btn" class:active={encMode === 'decrypt'} onclick={() => { encMode = 'decrypt'; encResult = null; }}>
+              🔓 Decrypt
+            </button>
+          </div>
+
+          <!-- Selected file -->
+          {#if encFilePath}
+            <div class="source-item">
+              <span class="src-icon">📄</span>
+              <span class="src-path">{encFilePath}</span>
+              <button class="btn-remove" onclick={() => { encFilePath = ""; encResult = null; }}>✕</button>
+            </div>
+          {/if}
+
+          <!-- Password input -->
+          <div class="enc-pw-row">
+            <input
+              type="password"
+              class="enc-pw-input"
+              placeholder="Enter {encMode === 'encrypt' ? 'encryption' : 'decryption'} password"
+              bind:value={encPassword}
+              disabled={busy}
+            />
+          </div>
+
+          <!-- Action buttons -->
+          <div class="btn-row">
+            <button class="btn" onclick={browseEncFile} disabled={busy}>
+              📄 Select File
+            </button>
+            {#if encFilePath}
+              <button class="btn" onclick={clearEnc} disabled={busy}>
+                🗑️ Clear
+              </button>
+            {/if}
+          </div>
+
+          <button class="btn-primary" onclick={doEncrypt} disabled={busy || !encFilePath || !encPassword}>
+            {busy
+              ? (encMode === 'encrypt' ? '🔄 Encrypting...' : '🔄 Decrypting...')
+              : (encMode === 'encrypt' ? '🔐 Encrypt File' : '🔓 Decrypt File')}
+          </button>
+
+          <!-- Result -->
+          {#if encResult}
+            <div class="result-card success">
+              <span class="result-icon">✅</span>
+              <div>
+                <strong>{encMode === 'encrypt' ? 'Encrypted' : 'Decrypted'} successfully</strong><br />
+                <span class="muted">{encResult}</span>
+              </div>
+            </div>
+          {/if}
+
+          <!-- Drop zone -->
+          {#if !encFilePath && !busy}
+            <div class="dropzone" role="button" tabindex="0"
+              ondragover={(e) => e.preventDefault()}
+              ondrop={onDrop}>
+              <span style="font-size:32px">🔐</span>
+              <p>Drop a file here to {encMode}</p>
+              <span class="hint">or click Select File to browse</span>
+            </div>
+          {/if}
         </div>
       {/if}
     </main>
@@ -574,6 +725,20 @@
   .entry-ratio { text-align: right; font-weight: 600; }
   .entry-ratio.good { color: var(--success); }
   .entry-ratio.bad { color: var(--warn); }
+
+  /* Encrypt tab */
+  .enc-mode-row { display: flex; gap: 8px; margin-bottom: 16px; }
+  .mode-btn { flex: 1; justify-content: center; text-align: center; font-size: 14px; padding: 10px; }
+  .mode-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .enc-pw-row { margin-bottom: 16px; }
+  .enc-pw-input {
+    width: 100%; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 14px; box-sizing: border-box;
+    outline: none; transition: border-color 0.15s;
+  }
+  .enc-pw-input:focus { border-color: var(--primary); }
+  .enc-pw-input::placeholder { color: var(--text-muted); }
+  .enc-pw-input:disabled { opacity: 0.5; }
 
   /* Dropzone */
   .dropzone {

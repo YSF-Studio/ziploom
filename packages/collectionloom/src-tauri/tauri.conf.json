@@ -27,25 +27,10 @@
   },
   "plugins": {
     "fs": {
-      "scope": {
-        "allow": [
-          {
-            "path": "$HOME/**"
-          },
-          {
-            "path": "/mnt/**"
-          }
-        ]
-      }
+      "requireLiteralLeadingDot": false
     },
     "shell": {
-      "scope": [
-        {
-          "name": "run-command",
-          "cmd": "bash",
-          "args": true
-        }
-      ]
+      "open": true
     }
   },
   "bundle": {

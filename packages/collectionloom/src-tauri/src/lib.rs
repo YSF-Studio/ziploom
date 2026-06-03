@@ -11,6 +11,36 @@ pub fn run() {
         .setup(|app| {
             let window = app.get_webview_window("main").unwrap();
             window.set_title("CollectionLoom — Portable Forensic Acquisition")?;
+
+            // ─── GUI Screenshot Mode ───
+            if std::env::var("COLLECTIONLOOM_SCREENSHOT").is_ok() {
+                let w = window.clone();
+                std::thread::spawn(move || {
+                    use std::time::Duration;
+                    std::thread::sleep(Duration::from_secs(5));
+
+                    // Cycle through sidebar sections by text label
+                    let sections = [
+                        "RAM Capture", "Mobile Triage", "Cloud Snapshot",
+                        "Network Capture", "System Snapshot", "Encryption",
+                        "Hash Verify", "Custody Chain", "About", "Disk Imaging"
+                    ];
+                    for section in &sections {
+                        let js = format!(
+                            "Array.from(document.querySelectorAll('.sidebar-item')).find(b=>b.textContent.includes('{}'))?.click();",
+                            section
+                        );
+                        let _ = w.eval(&js);
+                        std::thread::sleep(Duration::from_secs(4));
+                    }
+
+                    // Final: back to disk
+                    let _ = w.eval("Array.from(document.querySelectorAll('.sidebar-item')).find(b=>b.textContent.includes('Disk Imaging'))?.click();");
+                    std::thread::sleep(Duration::from_secs(3));
+                    eprintln!("[SCREENSHOT] All sections navigated");
+                });
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

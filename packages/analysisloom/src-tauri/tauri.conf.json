@@ -10,19 +10,25 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "windows": [{
-      "title": "AnalysisLoom",
-      "width": 1400,
-      "height": 900,
-      "resizable": true,
-      "decorations": false,
-      "titleBarStyle": "Overlay",
-      "hiddenTitle": true
-    }],
-    "security": { "csp": null }
+    "windows": [
+      {
+        "title": "AnalysisLoom",
+        "width": 1024,
+        "height": 768,
+        "resizable": true,
+        "decorations": false,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
   },
   "plugins": {
-    "fs": { "scope": { "allow": [{ "path": "$HOME/**" }, { "path": "/mnt/**" }] } }
+    "fs": {
+      "requireLiteralLeadingDot": false
+    }
   },
   "bundle": {
     "icon": [
