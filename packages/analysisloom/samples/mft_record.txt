@@ -1,0 +1,10 @@
+MFT Entry: 45
+File: confidential_report.txt
+Parent: 5 (Root)
+Created: 2026-05-15 14:30:00
+Modified: 2026-06-01 09:15:00
+Accessed: 2026-06-03 22:00:00
+MFT Modified: 2026-06-01 09:15:00
+Size: 4,096 bytes
+Flags: In Use | Archive
+Deleted: No

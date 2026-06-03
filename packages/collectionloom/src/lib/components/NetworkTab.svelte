@@ -1,6 +1,6 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
-let { busy, msg, timeoutPromise } = $props();
+let { setBusy, setMsg, timeoutPromise } = $props();
 let interfaces = $state([]);
 let iface = $state("");
 let bpf = $state("");
@@ -8,15 +8,15 @@ let outFile = $state("/mnt/evidence/capture.pcapng");
 let capturing = $state(false);
 
 async function listIface() {
-  busy = true;
+  setBusy(true);
   try { interfaces = await timeoutPromise(invoke("list_interfaces"), 5000); } catch(e) {}
-  busy = false;
+  setBusy(false);
 }
 async function startCapture() {
   capturing = true;
   try {
     const r = await timeoutPromise(invoke("start_network_capture", { interface: iface, bpfFilter: bpf || null, outputFile: outFile }), 10000);
-    msg = r;
+    setMsg(r);
   } catch(e) {}
   capturing = false;
 }

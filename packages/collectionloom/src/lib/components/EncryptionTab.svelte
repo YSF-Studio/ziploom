@@ -1,23 +1,23 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
-let { state, busy, msg, timeoutPromise } = $props();
+let { state, setBusy, setMsg, timeoutPromise } = $props();
 
 let report = $state(null);
 
 async function scanNow() {
-  busy = true;
+  setBusy(true);
   try {
     report = await timeoutPromise(invoke("scan_encryption"), 30000);
     if (report.hasFde) {
-      msg = `\u26a0\ufe0f Full Disk Encryption detected — capture RAM before shutdown!`;
+      setMsg(`\u26a0\ufe0f Full Disk Encryption detected — capture RAM before shutdown!`);
     } else {
-      msg = "\u2705 No full disk encryption detected";
+      setMsg("\u2705 No full disk encryption detected");
     }
   } catch(e) {
     const err = typeof e === "string" ? e : String(e);
-    if (err !== "TIMEOUT") msg = `\u274c ${err}`;
+    if (err !== "TIMEOUT") setMsg(`\u274c ${err}`);
   }
-  busy = false;
+  setBusy(false);
 }
 </script>
 

@@ -13,12 +13,10 @@
     "windows": [
       {
         "title": "CollectionLoom",
-        "width": 1200,
-        "height": 840,
+        "width": 1100,
+        "height": 680,
         "resizable": true,
-        "decorations": false,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "decorations": true
       }
     ],
     "security": {
@@ -26,11 +24,11 @@
     }
   },
   "plugins": {
-    "fs": {
-      "requireLiteralLeadingDot": false
-    },
     "shell": {
       "open": true
+    },
+    "fs": {
+      "requireLiteralLeadingDot": false
     }
   },
   "bundle": {

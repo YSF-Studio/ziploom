@@ -18,12 +18,12 @@ let busy = $state(false);
 let wbActive = $state(false);
 let progress = $state(null);
 
-// Shared state
-let diskState = $state({});
-let ramState = $state({});
-let encryptionState = $state({});
-let cocState = $state({});
-let wbState = $state({ active: false });
+// Shared state — plain objects, no $state() to avoid Svelte 5 Proxy subscribe pattern in WebKit
+let diskState = {};
+let ramState = {};
+let encryptionState = {};
+let cocState = {};
+let wbState = { active: false };
 
 function timeoutPromise(promise, ms) {
   let timer;
@@ -32,6 +32,9 @@ function timeoutPromise(promise, ms) {
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
+
+function setBusy(v) { busy = v; }
+function setMsg(m) { msg = m; }
 
 const sidebarSections = [
   {
@@ -103,23 +106,23 @@ $effect(() => {
     <!-- Content Area -->
     <div class="content-area">
       {#if activeSection === "disk"}
-        <DiskTab bind:state={diskState} bind:busy bind:msg {timeoutPromise} />
+        <DiskTab state={diskState} {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "ram"}
-        <RamTab bind:state={ramState} bind:busy bind:msg {timeoutPromise} />
+        <RamTab state={ramState} {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "mobile"}
-        <MobileTab bind:busy bind:msg {timeoutPromise} />
+        <MobileTab {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "cloud"}
-        <CloudTab bind:busy bind:msg {timeoutPromise} />
+        <CloudTab {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "network"}
-        <NetworkTab bind:busy bind:msg {timeoutPromise} />
+        <NetworkTab {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "snapshot"}
-        <SnapshotTab bind:busy bind:msg {timeoutPromise} />
+        <SnapshotTab {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "encryption"}
-        <EncryptionTab bind:state={encryptionState} bind:busy bind:msg {timeoutPromise} />
+        <EncryptionTab state={encryptionState} {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "verify"}
-        <VerificationTab bind:busy bind:msg {timeoutPromise} />
+        <VerificationTab {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "coc"}
-        <CocTab bind:state={cocState} bind:busy bind:msg {timeoutPromise} />
+        <CocTab state={cocState} {setBusy} {setMsg} {timeoutPromise} />
       {:else if activeSection === "about"}
         <DisclaimerTab />
       {/if}

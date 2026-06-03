@@ -1,6 +1,6 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
-let { state, busy, msg, timeoutPromise } = $props();
+let { state, setBusy, setMsg, timeoutPromise } = $props();
 
 let disks = $state([]);
 let selectedDisk = $state("");
@@ -12,18 +12,18 @@ let collBusy = $state(false);
 let pollId = $state(null);
 
 async function listDisks() {
-  busy = true;
+  setBusy(true);
   try {
     disks = await timeoutPromise(invoke("list_disks"), 15000);
   } catch(e) {
     const err = typeof e === "string" ? e : String(e);
-    if (err !== "TIMEOUT") msg = `\u274c ${err}`;
+    if (err !== "TIMEOUT") setMsg(`\u274c ${err}`);
   }
-  busy = false;
+  setBusy(false);
 }
 
 async function startImaging() {
-  if (!selectedDisk || !destPath) { msg = "\u26a0\ufe0f Select a disk and destination"; return; }
+  if (!selectedDisk || !destPath) { setMsg("\u26a0\ufe0f Select a disk and destination"); return; }
   collBusy = true;
   try {
     await timeoutPromise(invoke("start_disk_imaging", { source: selectedDisk, destination: destPath, splitSizeMb: parseInt(splitSize) || 0, verify: shouldVerify }), 5000);
@@ -32,13 +32,13 @@ async function startImaging() {
       try {
         const p = await invoke("get_imaging_progress");
         progress = p;
-        if (p.isDone) { clearInterval(pollId); collBusy = false; msg = p.error ? `\u274c ${p.error}` : "\u2705 Imaging complete!"; }
+        if (p.isDone) { clearInterval(pollId); collBusy = false; setMsg(p.error ? `\u274c ${p.error}` : "\u2705 Imaging complete!"); }
       } catch(e) { clearInterval(pollId); collBusy = false; }
     }, 500);
   } catch(e) {
     collBusy = false;
     const err = typeof e === "string" ? e : String(e);
-    if (err !== "TIMEOUT") msg = `\u274c ${err}`;
+    if (err !== "TIMEOUT") setMsg(`\u274c ${err}`);
   }
 }
 

@@ -1,36 +1,36 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
 
-let { busy, msg, timeoutPromise } = $props();
+let { setBusy, setMsg, timeoutPromise } = $props();
 let loading = $state(false);
 let snapshotResult = $state(null);
 let compareResult = $state(null);
 
 async function takeSnapshot() {
-    loading = true; busy = true;
+    loading = true; setBusy(true);
     try {
         const result = await timeoutPromise(invoke("take_snapshot"), 60000);
         snapshotResult = result;
-        msg = "✅ Snapshot captured successfully";
+        setMsg("✅ Snapshot captured successfully");
     } catch(e) {
-        msg = `❌ ${typeof e === "string" ? e : String(e)}`;
+        setMsg(`❌ ${typeof e === "string" ? e : String(e)}`);
     }
-    loading = false; busy = false;
+    loading = false; setBusy(false);
 }
 
 async function compareSnapshot() {
     if (!snapshotResult) return;
-    loading = true; busy = true;
+    loading = true; setBusy(true);
     try {
         const diff = await timeoutPromise(invoke("compare_snapshot", {
             previousId: snapshotResult.id
         }), 60000);
         compareResult = diff;
-        msg = `✅ Diff complete — ${diff.changes || "no"} changes detected`;
+        setMsg(`✅ Diff complete — ${diff.changes || "no"} changes detected`);
     } catch(e) {
-        msg = `❌ ${typeof e === "string" ? e : String(e)}`;
+        setMsg(`❌ ${typeof e === "string" ? e : String(e)}`);
     }
-    loading = false; busy = false;
+    loading = false; setBusy(false);
 }
 
 function riskColor(level) {

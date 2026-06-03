@@ -1,6 +1,6 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
-let { state, busy, msg, timeoutPromise } = $props();
+let { state, setBusy, setMsg, timeoutPromise } = $props();
 let evidenceId = $state("");
 let caseName = $state("");
 let operator = $state("Yusuf Shalahuddin");
@@ -8,24 +8,24 @@ let device = $state("");
 let actions = $state([]);
 
 async function createCoc() {
-  busy = true;
+  setBusy(true);
   try {
     evidenceId = await timeoutPromise(invoke("create_chain_of_custody", { caseName, operator, sourceDevice: device }), 5000);
     actions = [{ timestamp: new Date().toISOString(), action: "CoC created", details: `Evidence ${evidenceId}`, hash: null }];
-    msg = `✅ Chain of custody created: ${evidenceId}`;
-  } catch(e) { msg = `❌ ${typeof e === "string" ? e : String(e)}`; }
-  busy = false;
+    setMsg(`✅ Chain of custody created: ${evidenceId}`);
+  } catch(e) { setMsg(`❌ ${typeof e === "string" ? e : String(e)}`); }
+  setBusy(false);
 }
 async function addAction(act, det) {
   actions = [...actions, { timestamp: new Date().toISOString(), action: act, details: det, hash: null }];
 }
 async function generatePdf() {
-  busy = true;
+  setBusy(true);
   try {
     const path = await timeoutPromise(invoke("generate_coc_report", { evidenceId }), 15000);
-    msg = `✅ PDF report saved to ${path}`;
-  } catch(e) { msg = `❌ ${typeof e === "string" ? e : String(e)}`; }
-  busy = false;
+    setMsg(`✅ PDF report saved to ${path}`);
+  } catch(e) { setMsg(`❌ ${typeof e === "string" ? e : String(e)}`); }
+  setBusy(false);
 }
 </script>
 

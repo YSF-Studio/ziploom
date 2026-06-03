@@ -1,6 +1,6 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
-let { state, busy, msg, timeoutPromise } = $props();
+let { state, setBusy, setMsg, timeoutPromise } = $props();
 let tools = $state([]);
 let selectedTool = $state("");
 let outputPath = $state("/mnt/evidence/ram_capture.lime");
@@ -9,18 +9,18 @@ let progress = $state(null);
 let ramSize = $state(null);
 
 async function listTools() {
-  busy = true;
+  setBusy(true);
   try { tools = await timeoutPromise(invoke("list_ram_tools"), 5000); } catch(e) {}
   try { ramSize = await timeoutPromise(invoke("get_ram_size"), 5000); } catch(e) {}
-  busy = false;
+  setBusy(false);
 }
 async function capture() {
-  busy = true;
+  setBusy(true);
   try {
     const result = await timeoutPromise(invoke("capture_ram", { tool: selectedTool, output: outputPath, compress }), 120000);
-    msg = `✅ ${result}`;
-  } catch(e) { msg = `❌ ${typeof e === "string" ? e : String(e)}`; }
-  busy = false;
+    setMsg(`✅ ${result}`);
+  } catch(e) { setMsg(`❌ ${typeof e === "string" ? e : String(e)}`); }
+  setBusy(false);
 }
 $effect(() => { listTools(); });
 </script>

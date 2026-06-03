@@ -30,7 +30,7 @@
       msg = "❌ All fields are required";
       return;
     }
-    busy = true;
+    setBusy(true);
     result = null;
     resultRaw = "";
     msg = "";
@@ -54,7 +54,7 @@
         msg = `❌ ${err}`;
       }
     }
-    busy = false;
+    setBusy(false);
   }
 </script>
 

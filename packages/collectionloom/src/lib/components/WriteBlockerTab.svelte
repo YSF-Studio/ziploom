@@ -1,30 +1,30 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
-let { busy, msg, timeoutPromise } = $props();
+let { setBusy, setMsg, timeoutPromise } = $props();
 let device = $state("");
 let status = $state("Unknown");
 let enabled = $state(false);
 
 async function enable() {
-  busy = true;
+  setBusy(true);
   try {
     await timeoutPromise(invoke("enable_write_blocker", { device }), 10000);
-    enabled = true; status = "ACTIVE"; msg = "✅ Write blocker enabled";
+    enabled = true; status = "ACTIVE"; setMsg("✅ Write blocker enabled");
     // Verify
     try { await invoke("check_write_blocker", { device }); } catch{}
   } catch(e) {
     const err = typeof e === "string" ? e : String(e);
-    msg = `❌ ${err}`;
+    setMsg(`❌ ${err}`);
   }
-  busy = false;
+  setBusy(false);
 }
 async function disable() {
-  busy = true;
+  setBusy(true);
   try {
     await timeoutPromise(invoke("disable_write_blocker", { device }), 10000);
-    enabled = false; status = "Disabled"; msg = "✅ Write blocker disabled";
-  } catch(e) { msg = `❌ ${typeof e === "string" ? e : String(e)}`; }
-  busy = false;
+    enabled = false; status = "Disabled"; setMsg("✅ Write blocker disabled");
+  } catch(e) { setMsg(`❌ ${typeof e === "string" ? e : String(e)}`); }
+  setBusy(false);
 }
 </script>
 

@@ -16,9 +16,7 @@
         "width": 1024,
         "height": 768,
         "resizable": true,
-        "decorations": false,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true
+        "decorations": true
       }
     ],
     "security": {

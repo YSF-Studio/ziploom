@@ -1,27 +1,27 @@
 <script>
 import { invoke } from "@tauri-apps/api/core";
-let { busy, msg, timeoutPromise } = $props();
+let { setBusy, setMsg, timeoutPromise } = $props();
 let androidDevices = $state([]);
 let iosDevices = $state([]);
 let outputPath = $state("/mnt/evidence/");
 
 async function scanAndroid() {
-  busy = true;
-  try { androidDevices = await timeoutPromise(invoke("list_android_devices"), 10000); } catch(e) { msg = `❌ ${typeof e === "string" ? e : String(e)}`; }
-  busy = false;
+  setBusy(true);
+  try { androidDevices = await timeoutPromise(invoke("list_android_devices"), 10000); } catch(e) { setMsg(`❌ ${typeof e === "string" ? e : String(e)}`); }
+  setBusy(false);
 }
 async function scanIos() {
-  busy = true;
-  try { iosDevices = await timeoutPromise(invoke("list_ios_devices"), 10000); } catch(e) { msg = `❌ ${typeof e === "string" ? e : String(e)}`; }
-  busy = false;
+  setBusy(true);
+  try { iosDevices = await timeoutPromise(invoke("list_ios_devices"), 10000); } catch(e) { setMsg(`❌ ${typeof e === "string" ? e : String(e)}`); }
+  setBusy(false);
 }
 async function backupAndroid(id) {
-  busy = true;
+  setBusy(true);
   try {
     const r = await timeoutPromise(invoke("adb_backup", { deviceId: id, output: outputPath + "android_backup.ab" }), 300000);
-    msg = `✅ ${r}`;
-  } catch(e) { msg = `❌ ${typeof e === "string" ? e : String(e)}`; }
-  busy = false;
+    setMsg(`✅ ${r}`);
+  } catch(e) { setMsg(`❌ ${typeof e === "string" ? e : String(e)}`); }
+  setBusy(false);
 }
 </script>
 

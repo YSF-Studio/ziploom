@@ -1,0 +1,15 @@
+{
+  "case": "CASE-2026-001",
+  "acquisition": {
+    "method": "bit-for-bit",
+    "device": "/dev/nvme0n1",
+    "sha256": "a1b2c3d4e5f6a7b8...",
+    "verified": true,
+    "timestamp": "2026-06-01T10:30:00Z"
+  },
+  "ram_capture": {
+    "file": "memdump.raw",
+    "size": "32 GB",
+    "tool": "avml"
+  }
+}
