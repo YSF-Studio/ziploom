@@ -1,5 +1,4 @@
 title = "YSF Studio — Gitleaks Config"
-extend = 0
 
 [allowlist]
 description = "Known false positives in YSF Studio codebase"
