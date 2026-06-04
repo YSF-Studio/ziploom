@@ -2,7 +2,6 @@
   import { invoke } from "@tauri-apps/api/core";
   import { open } from "@tauri-apps/plugin-dialog";
   import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
-  import Logo from "./lib/Logo.svelte";
 
   let activeTab = $state(0);
   let msg = $state("");
@@ -25,7 +24,7 @@
   // ─── Encrypt State ───
   let encFilePath = $state("");
   let encPassword = $state("");
-  let encMode = $state("encrypt"); // "encrypt" or "decrypt"
+  let encMode = $state("encrypt");
   let encResult = $state(null);
 
   function timeoutPromise(promise, ms) {
@@ -37,11 +36,11 @@
   }
 
   const tabs = [
-    { label: "Compress", icon: "▤" },
-    { label: "Extract", icon: "▸" },
-    { label: "Inspect", icon: "◎" },
-    { label: "About", icon: "ⓘ" },
-    { label: "Encrypt", icon: "⚷" },
+    { label: "Compress", icon: "\uD83D\uDDDC\uFE0F" },
+    { label: "Extract", icon: "\uD83D\uDCC1" },
+    { label: "Inspect", icon: "\uD83D\uDD0D" },
+    { label: "About", icon: "\u2139\uFE0F" },
+    { label: "Encrypt", icon: "\uD83D\uDD10" },
   ];
 
   const formats = [
@@ -269,27 +268,7 @@
     return ratio.toFixed(0);
   }
 
-  // About info (static, no invoke needed)
-  const aboutInfo = {
-    appName: "ZipLoom",
-    version: "0.1.0",
-    developer: "YSF Studio — Built with ❤️ by Yusuf Shalahuddin",
-    build: "Master Build — All Features Unlocked",
-    features: [
-      "Drag & Drop Archive Compression & Extraction",
-      "Multi-format Support: ZIP, TAR, GZ, BZ2, XZ, 7Z, RAR",
-      "Archive Inspector — Preview contents without extracting",
-      "AES-256 Encryption for Sensitive Archives",
-      "Clean ZIP Output — No macOS Metadata Pollution",
-      "100% Offline — Zero Data Collection. All processing runs locally."
-    ],
-    disclaimer: "This software is provided 'AS-IS'. Results should be independently verified before use in legal proceedings.",
-    offline: true,
-    privacy: "100% offline — zero data collection. No telemetry, no analytics, no external network calls."
-  };
-
-  // Register drop handler on window
-  let unlisten = $state();
+  // ─── Tauri drag-drop listener ───
   $effect(() => {
     const win = getCurrentWebviewWindow();
     win.onDragDropEvent(async (event) => {
@@ -332,9 +311,9 @@
     <div class="traffic-lights">
       <span class="tl red"></span><span class="tl yellow"></span><span class="tl green"></span>
     </div>
-    <Logo size={22} />
     <span class="title">ZipLoom</span>
-    <span class="version">v0.1.0</span>
+    <span class="title-sep">—</span>
+    <span class="title-desc">Archive Utility</span>
     <div class="tabstrip">
       {#each tabs as tab, i}
         <button class:active={activeTab === i} onclick={() => { activeTab = i; msg = ""; }}>
@@ -358,7 +337,6 @@
             Select files and folders, choose a format, then compress into an archive.
           </p>
 
-          <!-- Source list -->
           {#if compSources.length > 0}
             <div class="source-list">
               <h4>Selected ({compSources.length} item{compSources.length > 1 ? 's' : ''})</h4>
@@ -372,7 +350,6 @@
             </div>
           {/if}
 
-          <!-- Format selector -->
           <div class="format-row">
             <label for="format-select">Format:</label>
             <select id="format-select" bind:value={compFormat} disabled={busy}>
@@ -382,18 +359,15 @@
             </select>
           </div>
 
-          <!-- Add buttons -->
           <div class="btn-row">
             <button class="btn" onclick={browseDir} disabled={busy}>📁 Add Folder</button>
             <button class="btn" onclick={browseSources} disabled={busy}>📄 Add Files</button>
           </div>
 
-          <!-- Compress button -->
           <button class="btn-primary" onclick={doCompress} disabled={busy || compSources.length === 0}>
             {busy ? '🔄 Compressing...' : '🗜️ Compress'}
           </button>
 
-          <!-- Result -->
           {#if compResult}
             <div class="result-card success">
               <span class="result-icon">✅</span>
@@ -404,7 +378,6 @@
             </div>
           {/if}
 
-          <!-- Empty state with drop zone -->
           {#if compSources.length === 0 && !busy}
             <div class="dropzone" role="button" tabindex="0"
               ondragover={(e) => e.preventDefault()}
@@ -526,40 +499,63 @@
           {/if}
         </div>
 
-      <!-- ─── ABOUT TAB ─── -->
+      <!-- ─── ABOUT TAB ─── (redesigned to match screenshot) -->
       {:else if activeTab === 3}
-        <div style="max-width:580px;margin:0 auto">
-          <div style="text-align:center;margin-bottom:20px">
-            <img src="/icon.png" style="width:72px;height:72px;border-radius:16px;margin-bottom:8px" alt="ZipLoom" />
-            <h3 style="margin:0 0 4px">{aboutInfo.appName}<span style="color:var(--text-muted);font-size:12px;margin-left:8px">v{aboutInfo.version}</span></h3>
-            <p style="color:var(--text-secondary);font-size:13px;margin:0">Archive Utility — Fast, Clean, Offline</p>
+        <div class="about-page">
+          <div class="about-hero">
+            <div class="about-icon">
+              <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+                <rect width="72" height="72" rx="16" fill="#3B82F6"/>
+                <rect x="14" y="20" width="44" height="34" rx="4" fill="white" opacity="0.95"/>
+                <rect x="20" y="28" width="32" height="4" rx="2" fill="#3B82F6" opacity="0.3"/>
+                <rect x="20" y="36" width="24" height="4" rx="2" fill="#3B82F6" opacity="0.3"/>
+                <rect x="20" y="44" width="16" height="4" rx="2" fill="#3B82F6" opacity="0.3"/>
+                <rect x="30" y="14" width="4" height="14" rx="2" fill="white"/>
+                <rect x="36" y="10" width="4" height="18" rx="2" fill="white"/>
+              </svg>
+            </div>
+            <h1 class="about-title">ZipLoom</h1>
+            <p class="about-version">Version 1.0</p>
+            <p class="about-tagline">Archive Utility &amp; Forensic Inspector</p>
+            <p class="about-subtext">Pure Rust · Offline · Private</p>
           </div>
-          <div class="card" style="margin-bottom:12px">
-            <h4>🚀 Features</h4>
-            <ul style="margin:0;padding-left:20px">
-              {#each aboutInfo.features as f}
-                <li style="font-size:13px;color:var(--text-secondary);margin-bottom:6px;line-height:1.4">{f}</li>
-              {/each}
-            </ul>
+
+          <div class="about-features">
+            {#each [
+              '8 formats: ZIP · TAR · GZ · BZ2 · XZ · Zstandard — compress & extract',
+              '7-Zip & RAR — extract support',
+              'AES-256 encrypted archives (ZIP)',
+              'Zstandard (.zst/.tzst) — modern fast compression',
+              'Forensic analysis — magic byte verification',
+              'Entropy scanning & anomaly detection',
+              'Batch hashing (MD5, SHA-1, SHA-256)',
+              'Archive conversion & split volumes',
+              '100% offline · zero data collection',
+            ] as feat}
+              <div class="feature-row">
+                <span class="feature-check">✅</span>
+                <span class="feature-text">{feat}</span>
+              </div>
+            {/each}
           </div>
-          <div class="card" style="margin-bottom:12px;border-left:3px solid var(--success)">
-            <h4>🔒 Privacy & Security</h4>
-            <p style="font-size:13px;color:var(--text-secondary);margin:0;line-height:1.5">{aboutInfo.privacy}</p>
-            <span class="offline-badge" style="margin-top:8px">✅ Fully Offline</span>
+
+          <div class="about-disclaimer">
+            <div class="disclaimer-header">⚠️ <strong>LEGAL DISCLAIMER</strong></div>
+            <p>
+              ZipLoom is provided "AS-IS" with NO WARRANTY of any kind, express or implied.
+              NOT certified for court evidence, ISO auditing, NIST validation, or any forensic standard compliance.
+              All forensic analysis results are informational only. Users must independently verify all findings before
+              use in any legal, compliance, or security context.
+              This tool is intended for authorized security research and personal archive management only.
+            </p>
           </div>
-          <div class="card" style="margin-bottom:12px;border-left:3px solid var(--warn)">
-            <h4>⚖️ Disclaimer</h4>
-            <p style="font-size:13px;color:var(--text-secondary);margin:0;font-style:italic">{aboutInfo.disclaimer}</p>
+
+          <div class="about-footer">
+            <p class="footer-hearts">Made with ❤️ by Yusuf Shalahuddin Al Ayyubi As Sobari</p>
+            <p class="footer-brand">YSF Studio</p>
           </div>
-          <div class="card">
-            <h4>👨‍💻 Developer</h4>
-            <p style="font-size:13px;color:var(--text);margin:0 0 4px;font-weight:600">{aboutInfo.developer}</p>
-            <p style="font-size:12px;color:var(--primary);margin:0">{aboutInfo.build}</p>
-          </div>
-          <p style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:12px">
-            YSF Studio © {new Date().getFullYear()} — All rights reserved.
-          </p>
         </div>
+
       <!-- ─── ENCRYPT TAB ─── -->
       {:else if activeTab === 4}
         <div class="tab-content">
@@ -568,7 +564,6 @@
             AES-256-GCM encryption and decryption for individual files. Encrypted files are saved with a .aes256 extension.
           </p>
 
-          <!-- Mode toggle -->
           <div class="enc-mode-row">
             <button class="btn mode-btn" class:active={encMode === 'encrypt'} onclick={() => { encMode = 'encrypt'; encResult = null; }}>
               🔒 Encrypt
@@ -578,7 +573,6 @@
             </button>
           </div>
 
-          <!-- Selected file -->
           {#if encFilePath}
             <div class="source-item">
               <span class="src-icon">📄</span>
@@ -587,7 +581,6 @@
             </div>
           {/if}
 
-          <!-- Password input -->
           <div class="enc-pw-row">
             <input
               type="password"
@@ -598,7 +591,6 @@
             />
           </div>
 
-          <!-- Action buttons -->
           <div class="btn-row">
             <button class="btn" onclick={browseEncFile} disabled={busy}>
               📄 Select File
@@ -616,7 +608,6 @@
               : (encMode === 'encrypt' ? '🔐 Encrypt File' : '🔓 Decrypt File')}
           </button>
 
-          <!-- Result -->
           {#if encResult}
             <div class="result-card success">
               <span class="result-icon">✅</span>
@@ -627,7 +618,6 @@
             </div>
           {/if}
 
-          <!-- Drop zone -->
           {#if !encFilePath && !busy}
             <div class="dropzone" role="button" tabindex="0"
               ondragover={(e) => e.preventDefault()}
@@ -667,6 +657,10 @@
     padding: 10px 24px; font-size: 13px; z-index: 100; box-shadow: 0 4px 16px rgba(0,0,0,0.4);
   }
   .toast.error { border-color: var(--danger); color: var(--danger); }
+
+  /* Titlebar */
+  .titlebar .title-sep { color: var(--text-muted); font-size: 13px; margin: 0 4px; }
+  .titlebar .title-desc { color: var(--text-muted); font-size: 13px; }
 
   /* Source list */
   .source-list { margin-bottom: 16px; }
@@ -751,7 +745,112 @@
   .dropzone p { margin: 0; font-size: 14px; color: var(--text-secondary); }
   .hint { font-size: 11px; color: var(--text-muted); }
 
-  /* Status busy dot */
+  /* Busy dot */
   .busy-dot { background: var(--primary) !important; animation: pulse 1s infinite; }
   @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* ─── ABOUT PAGE (redesigned like screenshot) ─── */
+  .about-page {
+    max-width: 580px;
+    margin: 0 auto;
+    padding: 20px 0;
+  }
+
+  .about-hero {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .about-icon {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+
+  .about-title {
+    margin: 0 0 2px;
+    font-size: 28px;
+    font-weight: 700;
+  }
+
+  .about-version {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .about-tagline {
+    margin: 0 0 2px;
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  .about-subtext {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .about-features {
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .feature-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .feature-check {
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .feature-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .about-disclaimer {
+    margin-bottom: 20px;
+    padding: 12px 14px;
+    border: 1px solid rgba(234,179,8,0.3);
+    border-radius: 8px;
+    background: rgba(234,179,8,0.06);
+  }
+
+  .disclaimer-header {
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: var(--warn);
+  }
+
+  .about-disclaimer p {
+    margin: 0;
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.6;
+  }
+
+  .about-footer {
+    text-align: center;
+    padding-top: 4px;
+  }
+
+  .footer-hearts {
+    margin: 0 0 4px;
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .footer-brand {
+    margin: 0;
+    font-size: 12px;
+    color: var(--primary);
+  }
 </style>
