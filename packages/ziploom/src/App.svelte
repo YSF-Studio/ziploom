@@ -370,7 +370,13 @@
             <div class="dropzone-lg" role="button" tabindex="0"
               ondragover={(e) => e.preventDefault()}
               ondrop={onDrop}
-              onclick={() => browseSources()}>
+              onclick={() => browseSources()}
+              onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  browseSources();
+                }
+              }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);margin-bottom:8px">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
@@ -426,7 +432,13 @@
             <div class="dropzone-lg" role="button" tabindex="0"
               ondragover={(e) => e.preventDefault()}
               ondrop={onDrop}
-              onclick={() => browseArchive()}>
+              onclick={() => browseArchive()}
+              onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  browseArchive();
+                }
+              }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);margin-bottom:8px">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="7 10 12 15 17 10"/>
@@ -494,7 +506,13 @@
             <div class="dropzone-lg" role="button" tabindex="0"
               ondragover={(e) => e.preventDefault()}
               ondrop={onDrop}
-              onclick={() => browseInspect()}>
+              onclick={() => browseInspect()}
+              onkeydown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  browseInspect();
+                }
+              }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-muted);margin-bottom:8px">
                 <circle cx="11" cy="11" r="8"/>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"/>
