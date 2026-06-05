@@ -31,21 +31,13 @@
 
 ## Sample Files
 
-Sample files are included in the [`samples/`](samples/) directory for testing:
-
-| File | Description |
-|------|-------------|
-| `test_sample.zip` | Sample ZIP containing 3 forensic documents |
-| `confidential_report.txt` | Confidential financial report |
-| `evidence_manifest.txt` | Evidence hash manifest |
-| `case_metadata.xml` | Forensic case metadata |
+Sample files are included in the [`samples/`](samples/) directory for testing.
 
 ## 🚀 Quick Start
 
 ```bash
-# Build from source
 git clone https://github.com/YSF-Studio/ziploom.git
-cd ziploom/packages/ziploom
+cd ziploom
 npm install
 npm run tauri dev
 ```
@@ -56,9 +48,22 @@ Or download the latest release from the [Releases](https://github.com/YSF-Studio
 
 - **Backend:** Rust with Tauri v2
 - **Frontend:** SvelteKit 5
-- **Encryption:** AES-256-GCM via Rust `aes-gcm` crate
-- **Archives:** `zip`, `tar`, `flate2`, `bzip2`, `xz2`, `unrar`
+- **Core library:** `ysf-core` (vendored in `src-tauri/crates/ysf-core/`)
+
+## 📦 Shared Core
+
+This repo includes a **local copy** of `ysf-core` under `src-tauri/crates/ysf-core/`. It is duplicated (not published as a separate crate) so ZipLoom builds standalone without external dependencies.
+
+The same core is also embedded in [CollectionLoom](https://github.com/YSF-Studio/collectionloom) and [AnalysisLoom](https://github.com/YSF-Studio/analysisloom). When updating forensic logic, apply changes here first or sync manually across repos.
+
+## 🧪 Tests
+
+```bash
+cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml
+cargo build --manifest-path src-tauri/Cargo.toml
+npm run build
+```
 
 ## 📄 License
 
-MIT © YSF Studio — Built with ❤️ by Yusuf Shalahuddin
+MIT © YSF Studio

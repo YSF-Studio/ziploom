@@ -11,75 +11,8 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  detect:
-    name: 🧭 Detect App
-    runs-on: ubuntu-latest
-    outputs:
-      app_dir: ${{ steps.detect.outputs.app_dir }}
-      cargo_ws: ${{ steps.detect.outputs.cargo_ws }}
-      npm_lock: ${{ steps.detect.outputs.npm_lock }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: detect
-        run: |
-          # Infer app name from repository name (e.g. YSF-Studio/ziploom → ziploom)
-          REPO_NAME="${GITHUB_REPOSITORY#*/}"
-          echo "Repository: $GITHUB_REPOSITORY → app: $REPO_NAME"
-
-          # Check standalone structure (root level) — highest priority
-          if [ -f "src-tauri/Cargo.toml" ]; then
-            echo "Standalone mode: root"
-            echo "app_dir=." >> $GITHUB_OUTPUT
-            echo "cargo_ws=src-tauri" >> $GITHUB_OUTPUT
-            if [ -f "package-lock.json" ]; then
-              echo "npm_lock=package-lock.json" >> $GITHUB_OUTPUT
-            else
-              echo "npm_lock=." >> $GITHUB_OUTPUT
-            fi
-            exit 0
-          fi
-
-          # Check monorepo structure (packages/<app>/)
-          if [ -d "packages/$REPO_NAME" ] && [ -f "packages/$REPO_NAME/src-tauri/Cargo.toml" ]; then
-            echo "Monorepo mode: packages/$REPO_NAME"
-            echo "app_dir=packages/$REPO_NAME" >> $GITHUB_OUTPUT
-            echo "cargo_ws=packages/$REPO_NAME/src-tauri" >> $GITHUB_OUTPUT
-            # npm workspace: root has the lock file
-            if [ -f "packages/$REPO_NAME/package-lock.json" ]; then
-              echo "npm_lock=packages/$REPO_NAME/package-lock.json" >> $GITHUB_OUTPUT
-            elif [ -f "package-lock.json" ]; then
-              echo "npm_lock=package-lock.json" >> $GITHUB_OUTPUT
-            else
-              echo "npm_lock=." >> $GITHUB_OUTPUT
-            fi
-            exit 0
-          fi
-
-          # Fallback: check any packages/<app>/
-          for dir in packages/ziploom packages/collectionloom packages/analysisloom; do
-            if [ -f "$dir/package.json" ]; then
-              echo "Fallback detected: $dir"
-              echo "app_dir=$dir" >> $GITHUB_OUTPUT
-              echo "cargo_ws=$dir/src-tauri" >> $GITHUB_OUTPUT
-              if [ -f "$dir/package-lock.json" ]; then
-                echo "npm_lock=$dir/package-lock.json" >> $GITHUB_OUTPUT
-              elif [ -f "package-lock.json" ]; then
-                echo "npm_lock=package-lock.json" >> $GITHUB_OUTPUT
-              else
-                echo "npm_lock=." >> $GITHUB_OUTPUT
-              fi
-              exit 0
-            fi
-          done
-
-          echo "app_dir=." >> $GITHUB_OUTPUT
-          echo "cargo_ws=." >> $GITHUB_OUTPUT
-          echo "npm_lock=." >> $GITHUB_OUTPUT
-          echo "Warning: No app structure found, using root"
-
   build:
     name: Build (${{ matrix.platform }})
-    needs: detect
     runs-on: ${{ matrix.platform }}
     strategy:
       matrix:
@@ -89,39 +22,37 @@ jobs:
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
-        working-directory: ${{ needs.detect.outputs.app_dir }}
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
 
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          cache-workspaces: ${{ needs.detect.outputs.cargo_ws }}
+          cache-workspaces: |
+            src-tauri
+            src-tauri/crates/ysf-core
 
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: ${{ needs.detect.outputs.npm_lock }}
+          cache-dependency-path: package-lock.json
 
-      - name: Install npm deps
-        working-directory: ${{ needs.detect.outputs.app_dir }}
-        run: npm ci
+      - run: npm ci
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Test ysf-core
+        run: cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml
 
       - name: Build Rust
-        working-directory: ${{ needs.detect.outputs.app_dir }}
         run: cargo build --manifest-path src-tauri/Cargo.toml
 
       - name: Test Rust
-        working-directory: ${{ needs.detect.outputs.app_dir }}
         run: cargo test --manifest-path src-tauri/Cargo.toml
-
-      - name: Build Frontend
-        working-directory: ${{ needs.detect.outputs.app_dir }}
-        run: npm run build
 
   security:
     name: 🔒 Security Audit
-    needs: detect
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -134,11 +65,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cargo Audit (core)
+      - name: Cargo Audit (ysf-core)
         continue-on-error: true
         run: |
-          cargo install cargo-audit --locked 2>/dev/null
-          APPDIR="${{ needs.detect.outputs.app_dir }}"
-          if [ -d "packages/core" ]; then
-            cd packages/core && cargo audit 2>&1 || true
-          fi
+          cargo install cargo-audit --locked 2>/dev/null || true
+          cd src-tauri/crates/ysf-core && cargo audit 2>&1 || true

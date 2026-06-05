@@ -7,3 +7,5 @@ build/
 *.log
 .DS_Store
 Thumbs.db
+src-tauri/target/
+src-tauri/crates/ysf-core/target/

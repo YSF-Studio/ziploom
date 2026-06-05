@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<ForensicCase>
-  <CaseID>CASE-2026-001</CaseID>
-  <Examiner>Yusuf Shalahuddin</Examiner>
-  <Evidence>
-    <Item type="Disk" hash="sha256:a1b2c3d4..."/>
-    <Item type="RAM" hash="sha256:e5f6a7b8..."/>
-  </Evidence>
-</ForensicCase>

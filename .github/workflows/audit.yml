@@ -21,26 +21,23 @@ jobs:
         with:
           toolchain: stable
           cache-workspaces: |
-            packages/core
-            packages/ziploom/src-tauri
-            packages/collectionloom/src-tauri
-            packages/analysisloom/src-tauri
+            src-tauri
+            src-tauri/crates/ysf-core
       - name: Install cargo-audit
         run: cargo install cargo-audit --locked 2>/dev/null || true
-      - name: Audit all Cargo projects
+      - name: Audit Cargo projects
         continue-on-error: true
         run: |
-          for dir in packages/core packages/ziploom/src-tauri packages/collectionloom/src-tauri packages/analysisloom/src-tauri; do
+          for dir in src-tauri/crates/ysf-core src-tauri; do
             if [ -f "$dir/Cargo.toml" ]; then
               echo "=== Auditing $dir ==="
-              cd $dir && cargo audit 2>&1 || true
+              cd "$dir" && cargo audit 2>&1 || true
               cd - >/dev/null
             fi
           done
 
   sbom:
     name: 📦 SBOM Generation
-    if: hashFiles('packages/core/Cargo.toml') != ''
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,13 +46,13 @@ jobs:
           toolchain: stable
       - name: Install cargo-cyclonedx
         run: cargo install cargo-cyclonedx --locked 2>/dev/null || true
-      - name: Generate SBOM for each package
+      - name: Generate SBOM
         continue-on-error: true
         run: |
-          for dir in packages/core packages/ziploom/src-tauri packages/collectionloom/src-tauri packages/analysisloom/src-tauri; do
+          for dir in src-tauri/crates/ysf-core src-tauri; do
             if [ -f "$dir/Cargo.toml" ]; then
               echo "=== SBOM for $dir ==="
-              cd $dir && cargo cyclonedx 2>&1 || true
+              cd "$dir" && cargo cyclonedx 2>&1 || true
               cd - >/dev/null
             fi
           done

@@ -1,14 +1,23 @@
 {
-  "name": "ysf-forensic-suite",
+  "name": "ziploom",
   "private": true,
-  "workspaces": ["packages/collectionloom", "packages/analysisloom", "packages/ziploom"],
+  "version": "0.1.0",
+  "type": "module",
   "scripts": {
-    "dev:collectionloom": "cd packages/collectionloom && npm run tauri dev",
-    "dev:analysisloom": "cd packages/analysisloom && npm run tauri dev",
-    "build:collectionloom": "cd packages/collectionloom && npm run tauri build",
-    "build:analysisloom": "cd packages/analysisloom && npm run tauri build",
-    "test:core": "cd packages/core && cargo test",
-    "test:all": "cd packages/core && cargo test && cd ../collectionloom/src-tauri && cargo test && cd ../../analysisloom/src-tauri && cargo test",
-    "lint": "cd packages/core && cargo clippy"
+    "dev": "vite",
+    "build": "vite build",
+    "tauri": "tauri",
+    "tauri:dev": "npm run tauri dev",
+    "tauri:build": "npm run tauri build"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2",
+    "@tauri-apps/plugin-fs": "^2"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^5",
+    "svelte": "^5",
+    "vite": "^6"
   }
 }
