@@ -49,7 +49,7 @@ pcap = "2"
 libc = "0.2"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-winapi = { version = "0.3", features = ["winioctl", "fileapi", "handleapi", "winnt", "sysinfoapi", "minwinbase"] }
+winapi = { version = "0.3", features = ["winioctl", "fileapi", "handleapi", "winnt", "sysinfoapi", "minwinbase", "tlhelp32"] }
 
 [lib]
 name = "ysf_core"

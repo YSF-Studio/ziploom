@@ -720,48 +720,45 @@ fn capture_processes_macos() -> Result<Vec<ProcessEntry>, String> {
 
 #[cfg(target_os = "windows")]
 fn capture_processes_windows() -> Result<Vec<ProcessEntry>, String> {
-    use std::process::Command;
+    use std::ffi::CStr;
+    use std::mem::{size_of, zeroed};
+    use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
+    use winapi::um::tlhelp32::{
+        CreateToolhelp32Snapshot, Process32First, Process32Next, PROCESSENTRY32,
+        TH32CS_SNAPPROCESS,
+    };
 
-    let output = Command::new("tasklist")
-        .args(["/FO", "CSV", "/NH"])
-        .output()
-        .map_err(|e| format!("Cannot run tasklist: {}", e))?;
-
-    if !output.status.success() {
-        return Err(format!(
-            "tasklist failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        ));
-    }
-
-    let mut processes = Vec::new();
-    for line in String::from_utf8_lossy(&output.stdout).lines() {
-        let line = line.trim();
-        if line.is_empty() {
-            continue;
+    unsafe {
+        let snap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+        if snap == INVALID_HANDLE_VALUE {
+            return Err("CreateToolhelp32Snapshot failed".into());
         }
-        let mut parts = line.split(',');
-        let name = parts
-            .next()
-            .map(|s| s.trim_matches('"').to_string())
-            .unwrap_or_default();
-        let pid = parts
-            .next()
-            .and_then(|s| s.trim_matches('"').parse::<u32>().ok())
-            .unwrap_or(0);
-        if pid == 0 && name.is_empty() {
-            continue;
-        }
-        processes.push(ProcessEntry {
-            pid,
-            name,
-            state: "running".to_string(),
-            cpu_percent: 0.0,
-            memory_bytes: 0,
-        });
-    }
 
-    Ok(processes)
+        let mut entry: PROCESSENTRY32 = zeroed();
+        entry.dwSize = size_of::<PROCESSENTRY32>() as u32;
+        let mut processes = Vec::new();
+
+        if Process32First(snap, &mut entry) != 0 {
+            loop {
+                let name = CStr::from_ptr(entry.szExeFile.as_ptr())
+                    .to_string_lossy()
+                    .into_owned();
+                processes.push(ProcessEntry {
+                    pid: entry.th32ProcessID,
+                    name,
+                    state: "running".to_string(),
+                    cpu_percent: 0.0,
+                    memory_bytes: 0,
+                });
+                if Process32Next(snap, &mut entry) == 0 {
+                    break;
+                }
+            }
+        }
+
+        CloseHandle(snap);
+        Ok(processes)
+    }
 }
 
 fn capture_network() -> Result<Vec<NetworkEntry>, String> {
