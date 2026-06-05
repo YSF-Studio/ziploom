@@ -111,28 +111,12 @@ pub fn compress_files(
     }
 }
 
-fn compress_zip(
+fn add_sources_to_zip<'a, W: std::io::Write + std::io::Seek>(
+    zip: &mut zip::ZipWriter<W>,
     sources: &[String],
-    output: &str,
-    password: Option<&str>,
-) -> Result<OperationResult, String> {
+    options: zip::write::FileOptions<'a, ()>,
+) -> Result<(usize, u64), String> {
     use std::io::Write;
-    use zip::write::SimpleFileOptions;
-    use zip::AesMode;
-
-    let file = std::fs::File::create(output)
-        .map_err(|e| format!("Cannot create output file: {}", e))?;
-    let mut zip = zip::ZipWriter::new(file);
-
-    let password_buf = password.map(str::to_string);
-    let options = match password_buf.as_deref() {
-        None => SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated),
-        Some(pw) if pw.is_empty() => return Err("Password cannot be empty".into()),
-        Some(pw) => SimpleFileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated)
-            .with_aes_encryption(AesMode::Aes256, pw),
-    };
 
     let mut files_processed = 0usize;
     let mut total_size = 0u64;
@@ -140,7 +124,6 @@ fn compress_zip(
     for source in sources {
         let path = std::path::Path::new(source);
         if path.is_dir() {
-            // Walk directory recursively
             let walker = walkdir::WalkDir::new(path);
             for entry in walker.into_iter().filter_map(|e| e.ok()) {
                 if entry.file_type().is_file() {
@@ -175,6 +158,34 @@ fn compress_zip(
             files_processed += 1;
         }
     }
+
+    Ok((files_processed, total_size))
+}
+
+fn compress_zip(
+    sources: &[String],
+    output: &str,
+    password: Option<&str>,
+) -> Result<OperationResult, String> {
+    use zip::write::SimpleFileOptions;
+    use zip::AesMode;
+
+    let file = std::fs::File::create(output)
+        .map_err(|e| format!("Cannot create output file: {}", e))?;
+    let mut zip = zip::ZipWriter::new(file);
+
+    let password_buf = password.map(str::to_string);
+    let base = SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    let (files_processed, total_size) = if let Some(pw) = password_buf.as_deref() {
+        if pw.is_empty() {
+            return Err("Password cannot be empty".into());
+        }
+        let options = base.with_aes_encryption(AesMode::Aes256, pw);
+        add_sources_to_zip(&mut zip, sources, options)?
+    } else {
+        add_sources_to_zip(&mut zip, sources, base)?
+    };
 
     zip.finish().map_err(|e| format!("ZIP finalize error: {}", e))?;
 
