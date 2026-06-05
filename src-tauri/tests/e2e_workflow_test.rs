@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use ziploom_lib::commands::{
     about_info, compress_files, decrypt_file, encrypt_file, extract_archive, inspect_archive,
@@ -14,8 +15,11 @@ fn fixture_root() -> PathBuf {
         .join("e2e")
 }
 
+static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
 fn temp_output_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("ziploom-e2e-{}", std::process::id()));
+    let n = TEMP_COUNTER.fetch_add(1, Ordering::SeqCst);
+    let dir = std::env::temp_dir().join(format!("ziploom-e2e-{}-{}", std::process::id(), n));
     let _ = fs::remove_dir_all(&dir);
     fs::create_dir_all(&dir).expect("create temp output dir");
     dir
@@ -199,5 +203,9 @@ fn e2e_compress_password_protected_zip() {
 #[test]
 fn e2e_inspect_rejects_missing_archive() {
     let err = inspect_archive("/nonexistent/missing.zip".into(), None).unwrap_err();
-    assert!(err.to_lowercase().contains("failed") || err.to_lowercase().contains("read"));
+    let lower = err.to_lowercase();
+    assert!(
+        lower.contains("failed") || lower.contains("read") || lower.contains("cannot open"),
+        "expected missing-file error, got: {err}"
+    );
 }
