@@ -325,9 +325,13 @@ mod tests {
     use super::*;
     use std::io::Write;
 
+    fn unique_temp(label: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("{}-{}", label, uuid::Uuid::new_v4()))
+    }
+
     #[test]
     fn test_preview_text_file() {
-        let dir = std::env::temp_dir().join("pv_txt");
+        let dir = unique_temp("pv_txt");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("s.txt"), b"Hello forensic world\n").unwrap();
@@ -341,7 +345,7 @@ mod tests {
 
     #[test]
     fn test_preview_image_file() {
-        let dir = std::env::temp_dir().join("pv_img");
+        let dir = unique_temp("pv_img");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         // Create minimal PNG
@@ -354,7 +358,7 @@ mod tests {
 
     #[test]
     fn test_preview_hex() {
-        let dir = std::env::temp_dir().join("pv_hex");
+        let dir = unique_temp("pv_hex");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let data: Vec<u8> = (0..64u8).collect();
@@ -366,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_preview_metadata() {
-        let dir = std::env::temp_dir().join("pv_meta");
+        let dir = unique_temp("pv_meta");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("m.txt"), b"test").unwrap();
@@ -383,7 +387,7 @@ mod tests {
 
     #[test]
     fn test_preview_archive() {
-        let dir = std::env::temp_dir().join("pv_arc");
+        let dir = unique_temp("pv_arc");
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join("a.txt"), b"data").unwrap();

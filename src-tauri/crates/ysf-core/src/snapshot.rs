@@ -525,33 +525,26 @@ fn read_memory_info_macos() -> (u64, u64) {
 fn read_memory_info_windows() -> (u64, u64) {
     use std::process::Command;
 
-    let total_mb = Command::new("wmic")
-        .args(["computersystem", "get", "totalphysicalmemory"])
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "$os = Get-CimInstance Win32_OperatingSystem; \
+             [PSCustomObject]@{ TotalMB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1MB); \
+             AvailMB = [math]::Round($os.FreePhysicalMemory / 1024) } | ConvertTo-Json -Compress",
+        ])
         .output()
-        .ok()
-        .and_then(|o| {
-            String::from_utf8_lossy(&o.stdout)
-                .lines()
-                .nth(1)
-                .and_then(|l| l.trim().parse::<u64>().ok())
-                .map(|b| b / (1024 * 1024))
-        })
-        .unwrap_or(0);
+        .ok();
 
-    let avail_mb = Command::new("wmic")
-        .args(["OS", "get", "FreePhysicalMemory"])
-        .output()
-        .ok()
+    output
         .and_then(|o| {
-            String::from_utf8_lossy(&o.stdout)
-                .lines()
-                .nth(1)
-                .and_then(|l| l.trim().parse::<u64>().ok())
-                .map(|kb| kb / 1024)
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).ok()?;
+            let total = parsed.get("TotalMB")?.as_u64()?;
+            let avail = parsed.get("AvailMB")?.as_u64()?;
+            Some((total, avail))
         })
-        .unwrap_or(0);
-
-    (total_mb, avail_mb)
+        .unwrap_or((0, 0))
 }
 
 fn format_permissions(metadata: &std::fs::Metadata) -> String {
@@ -886,6 +879,10 @@ fn tcp_state_name(code: &str) -> String {
 mod tests {
     use super::*;
 
+    fn unique_temp(label: &str) -> std::path::PathBuf {
+        std::env::temp_dir().join(format!("{}-{}", label, uuid::Uuid::new_v4()))
+    }
+
     fn test_scan_root() -> String {
         std::env::temp_dir().to_string_lossy().into_owned()
     }
@@ -940,9 +937,9 @@ mod tests {
     
     #[test]
     fn test_snapshot_detects_file_creation() {
-        let temp = std::env::temp_dir().join("snap_test_create");
+        let temp = unique_temp("snap_test_create");
         let _ = std::fs::remove_dir_all(&temp);
-        std::fs::create_dir_all(&temp).unwrap();
+        std::fs::create_dir_all(&temp).expect("create temp dir");
         std::fs::write(temp.join("before.txt"), b"before").unwrap();
         
         let a = take_snapshot("create_a", Some(temp.to_str().unwrap())).unwrap();
@@ -961,7 +958,7 @@ mod tests {
     
     #[test]
     fn test_snapshot_detects_file_deletion() {
-        let temp = std::env::temp_dir().join("snap_test_delete");
+        let temp = unique_temp("snap_test_delete");
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
         std::fs::write(temp.join("todelete.txt"), b"delete me").unwrap();
@@ -982,7 +979,7 @@ mod tests {
     
     #[test]
     fn test_snapshot_detects_file_modification() {
-        let temp = std::env::temp_dir().join("snap_test_modify");
+        let temp = unique_temp("snap_test_modify");
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
         std::fs::write(temp.join("modify.txt"), b"original content").unwrap();
@@ -1006,7 +1003,7 @@ mod tests {
     
     #[test]
     fn test_risk_level_assessment() {
-        let temp = std::env::temp_dir().join("snap_test_risk");
+        let temp = unique_temp("snap_test_risk");
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
         
