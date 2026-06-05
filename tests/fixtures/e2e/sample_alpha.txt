@@ -1,0 +1,4 @@
+ZipLoom E2E Test — Alpha Document
+Case ID: ZL-E2E-001
+Content: The quick brown fox jumps over the lazy dog.
+Timestamp: 2026-06-06

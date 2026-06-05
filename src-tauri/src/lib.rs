@@ -1,6 +1,6 @@
 use tauri::Manager;
 
-mod commands;
+pub mod commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -44,17 +44,7 @@ pub fn run() {
                     );
                     std::thread::sleep(Duration::from_millis(500));
                     let _ = w.eval(
-                        "window.__zipLoom?.setInspectResult({\
-                           format: 'ZIP', totalFiles: 12,\
-                           totalSize: 4587520, totalCompressed: 1253376,\
-                           entries: [\
-                             {path: 'financial_report.xlsx', size: 2048000, compressedSize: 786432, isDir: false},\
-                             {path: 'evidence_hash.txt', size: 4096, compressedSize: 2048, isDir: false},\
-                             {path: 'crime_scene_photo.jpg', size: 1536000, compressedSize: 362496, isDir: false},\
-                             {path: 'interview_transcript.pdf', size: 524288, compressedSize: 65536, isDir: false},\
-                             {path: 'network_logs.pcap', size: 475136, compressedSize: 38912, isDir: false},\
-                           ]\
-                         });"
+                        "window.__zipLoom?.setInspectArchive('/Users/yusuf/samples/evidence_manifest.zip');"
                     );
                     std::thread::sleep(Duration::from_millis(500));
 
@@ -71,11 +61,21 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::supported_formats,
+            commands::archive_needs_password,
             commands::inspect_archive,
             commands::compress_files,
             commands::extract_archive,
             commands::encrypt_file,
             commands::decrypt_file,
+            commands::stat_paths,
+            commands::check_tools,
+            commands::hash_file_sha256,
+            commands::hash_archive,
+            commands::get_progress,
+            commands::preview_archive_entry,
+            commands::forensic_scan_archive,
+            commands::extract_archive_entries,
+            commands::test_archive_integrity,
             commands::about_info,
         ])
         .run(tauri::generate_context!())

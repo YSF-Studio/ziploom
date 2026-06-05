@@ -7,8 +7,12 @@
     "dev": "vite",
     "build": "vite build",
     "tauri": "tauri",
-    "tauri:dev": "npm run tauri dev",
-    "tauri:build": "npm run tauri build"
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "test:gui": "npm run build && node tests/gui-smoke.mjs",
+    "test:e2e": "cargo test --manifest-path src-tauri/Cargo.toml --test e2e_workflow_test",
+    "test:all": "npm run test:e2e && npm run test:gui",
+    "screenshots": "npm run build && node tests/capture-screenshots.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
@@ -17,6 +21,8 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^5",
+    "@tauri-apps/cli": "^2",
+    "playwright": "^1.60.0",
     "svelte": "^5",
     "vite": "^6"
   }

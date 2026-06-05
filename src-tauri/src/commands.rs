@@ -23,6 +23,7 @@ pub struct ArchiveInfo {
 
 /// Result of compress/extract operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OperationResult {
     pub success: bool,
     pub output_path: String,
@@ -41,9 +42,20 @@ pub fn supported_formats() -> Vec<String> {
 // ─── Inspect Archive ───
 
 #[tauri::command]
-pub fn inspect_archive(path: String) -> Result<ArchiveInfo, String> {
-    let entries = archive::forensic_load(&path, None)
-        .map_err(|e| format!("Failed to read archive: {}", e))?;
+pub fn archive_needs_password(path: String) -> Result<bool, String> {
+    archive::needs_password(&path)
+}
+
+#[tauri::command]
+pub fn inspect_archive(path: String, password: Option<String>) -> Result<ArchiveInfo, String> {
+    let pw = password.as_deref();
+    let entries = archive::forensic_load(&path, pw).map_err(|e| {
+        if e == "PASSWORD_NEEDED" || e == "WRONG_PASSWORD" {
+            e
+        } else {
+            format!("Failed to read archive: {e}")
+        }
+    })?;
 
     let format = archive::detect_format(&path).unwrap_or("unknown");
     let format_str = format.to_string();
@@ -75,26 +87,51 @@ pub fn inspect_archive(path: String) -> Result<ArchiveInfo, String> {
 // ─── Compress Files ───
 
 #[tauri::command]
-pub fn compress_files(sources: Vec<String>, output: String, format: String) -> Result<OperationResult, String> {
+pub fn compress_files(
+    sources: Vec<String>,
+    output: String,
+    format: String,
+    password: Option<String>,
+) -> Result<OperationResult, String> {
     if sources.is_empty() {
         return Err("No source files specified".into());
     }
+    if password.is_some() && format != "zip" {
+        return Err("Password-protected archives are only supported for ZIP format".into());
+    }
 
     match format.as_str() {
-        "zip" => compress_zip(&sources, &output),
-        "tar" => compress_tar(&sources, &output, false),
-        "tar.gz" | "tgz" => compress_tar(&sources, &output, true),
-        _ => Err(format!("Unsupported format: {}. Use zip, tar, or tar.gz", format)),
+        "zip" => compress_zip(&sources, &output, password.as_deref()),
+        "tar" => compress_tar(&sources, &output, "plain"),
+        "tar.gz" | "tgz" => compress_tar(&sources, &output, "gzip"),
+        "tar.bz2" | "tbz2" => compress_tar(&sources, &output, "bzip2"),
+        "tar.xz" | "txz" => compress_tar(&sources, &output, "xz"),
+        "tar.zst" | "tzst" | "zstd" => compress_tar(&sources, &output, "zstd"),
+        _ => Err(format!("Unsupported format: {format}")),
     }
 }
 
-fn compress_zip(sources: &[String], output: &str) -> Result<OperationResult, String> {
+fn compress_zip(
+    sources: &[String],
+    output: &str,
+    password: Option<&str>,
+) -> Result<OperationResult, String> {
     use std::io::Write;
+    use zip::write::SimpleFileOptions;
+    use zip::AesMode;
+
     let file = std::fs::File::create(output)
         .map_err(|e| format!("Cannot create output file: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
-    let options = zip::write::FileOptions::<()>::default()
+
+    let mut options = SimpleFileOptions::default()
         .compression_method(zip::CompressionMethod::Deflated);
+    if let Some(pw) = password {
+        if pw.is_empty() {
+            return Err("Password cannot be empty".into());
+        }
+        options = options.with_aes_encryption(AesMode::Aes256, pw);
+    }
 
     let mut files_processed = 0usize;
     let mut total_size = 0u64;
@@ -140,171 +177,136 @@ fn compress_zip(sources: &[String], output: &str) -> Result<OperationResult, Str
 
     zip.finish().map_err(|e| format!("ZIP finalize error: {}", e))?;
 
+    let msg = if password.is_some() {
+        format!(
+            "Compressed {} files ({} KB) to password-protected ZIP {}",
+            files_processed,
+            total_size / 1024,
+            output
+        )
+    } else {
+        format!(
+            "Compressed {} files ({} KB) to {}",
+            files_processed,
+            total_size / 1024,
+            output
+        )
+    };
+
     Ok(OperationResult {
         success: true,
         output_path: output.to_string(),
         files_processed,
         total_size,
-        message: format!("Compressed {} files ({} KB) to {}", files_processed, total_size / 1024, output),
+        message: msg,
     })
 }
 
-fn compress_tar(sources: &[String], output: &str, gzip: bool) -> Result<OperationResult, String> {
-    let file = std::fs::File::create(output)
-        .map_err(|e| format!("Cannot create output: {}", e))?;
-
+fn append_tar_sources<W: std::io::Write>(
+    tar: &mut tar::Builder<W>,
+    sources: &[String],
+) -> Result<(usize, u64), String> {
     let mut files_processed = 0usize;
     let mut total_size = 0u64;
 
-    if gzip {
-        let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
-        let mut tar = tar::Builder::new(encoder);
-
-        for source in sources {
-            let path = std::path::Path::new(source);
-            if path.is_dir() {
-                let tar_result = tar.append_dir_all(
-                    path.file_name().unwrap_or_default(),
-                    path,
-                );
-                if let Err(e) = tar_result {
-                    return Err(format!("TAR dir error: {}", e));
+    for source in sources {
+        let path = std::path::Path::new(source);
+        if path.is_dir() {
+            tar.append_dir_all(path.file_name().unwrap_or_default(), path)
+                .map_err(|e| format!("TAR dir error: {e}"))?;
+            for entry in walkdir::WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+                if entry.file_type().is_file() {
+                    files_processed += 1;
+                    total_size += entry.metadata().map(|m| m.len()).unwrap_or(0);
                 }
-                // Count files
-                for entry in walkdir::WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
-                    if entry.file_type().is_file() {
-                        files_processed += 1;
-                        total_size += entry.metadata().map(|m| m.len()).unwrap_or(0);
-                    }
-                }
-            } else if path.is_file() {
-                tar.append_path_with_name(path, path.file_name().unwrap_or_default())
-                    .map_err(|e| format!("TAR error: {}", e))?;
-                files_processed += 1;
-                total_size += path.metadata().map(|m| m.len()).unwrap_or(0);
             }
+        } else if path.is_file() {
+            tar.append_path_with_name(path, path.file_name().unwrap_or_default())
+                .map_err(|e| format!("TAR error: {e}"))?;
+            files_processed += 1;
+            total_size += path.metadata().map(|m| m.len()).unwrap_or(0);
         }
-
-        let encoder = tar.into_inner().map_err(|e| format!("TAR finalize: {}", e))?;
-        encoder.finish().map_err(|e| format!("GZ finalize: {}", e))?;
-    } else {
-        let mut tar = tar::Builder::new(file);
-        for source in sources {
-            let path = std::path::Path::new(source);
-            if path.is_dir() {
-                tar.append_dir_all(path.file_name().unwrap_or_default(), path)
-                    .map_err(|e| format!("TAR dir error: {}", e))?;
-            } else if path.is_file() {
-                tar.append_path_with_name(path, path.file_name().unwrap_or_default())
-                    .map_err(|e| format!("TAR error: {}", e))?;
-            }
-        }
-        tar.finish().map_err(|e| format!("TAR finalize: {}", e))?;
     }
+
+    Ok((files_processed, total_size))
+}
+
+fn compress_tar(sources: &[String], output: &str, variant: &str) -> Result<OperationResult, String> {
+    let file = std::fs::File::create(output)
+        .map_err(|e| format!("Cannot create output: {e}"))?;
+
+    let (files_processed, total_size) = match variant {
+        "gzip" => {
+            let encoder = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+            let mut tar = tar::Builder::new(encoder);
+            let counts = append_tar_sources(&mut tar, sources)?;
+            let encoder = tar.into_inner().map_err(|e| format!("TAR finalize: {e}"))?;
+            encoder.finish().map_err(|e| format!("GZ finalize: {e}"))?;
+            counts
+        }
+        "bzip2" => {
+            let encoder = bzip2::write::BzEncoder::new(file, bzip2::Compression::default());
+            let mut tar = tar::Builder::new(encoder);
+            let counts = append_tar_sources(&mut tar, sources)?;
+            let encoder = tar.into_inner().map_err(|e| format!("TAR finalize: {e}"))?;
+            encoder.finish().map_err(|e| format!("BZ2 finalize: {e}"))?;
+            counts
+        }
+        "xz" => {
+            let encoder = xz2::write::XzEncoder::new(file, 6);
+            let mut tar = tar::Builder::new(encoder);
+            let counts = append_tar_sources(&mut tar, sources)?;
+            let encoder = tar.into_inner().map_err(|e| format!("TAR finalize: {e}"))?;
+            encoder.finish().map_err(|e| format!("XZ finalize: {e}"))?;
+            counts
+        }
+        "zstd" => {
+            let mut encoder = zstd::stream::write::Encoder::new(file, 3)
+                .map_err(|e| format!("ZST encoder: {e}"))?;
+            let mut tar = tar::Builder::new(&mut encoder);
+            let counts = append_tar_sources(&mut tar, sources)?;
+            tar.into_inner().map_err(|e| format!("TAR finalize: {e}"))?;
+            encoder.finish().map_err(|e| format!("ZST finalize: {e}"))?;
+            counts
+        }
+        _ => {
+            let mut tar = tar::Builder::new(file);
+            let counts = append_tar_sources(&mut tar, sources)?;
+            tar.finish().map_err(|e| format!("TAR finalize: {e}"))?;
+            counts
+        }
+    };
 
     Ok(OperationResult {
         success: true,
         output_path: output.to_string(),
         files_processed,
         total_size,
-        message: format!("Compressed {} files ({} KB) to {}", files_processed, total_size / 1024, output),
+        message: format!(
+            "Compressed {files_processed} files ({} KB) to {output}",
+            total_size / 1024
+        ),
     })
 }
 
-// ─── Extract Archive ───
+// ─── Extract Archive (pure Rust: zip / tar / sevenz-rust / unrar crate) ───
 
 #[tauri::command]
-pub fn extract_archive(archive_path: String, output_dir: String) -> Result<OperationResult, String> {
-    let entries = archive::forensic_load(&archive_path, None)
-        .map_err(|e| format!("Failed to read archive: {}", e))?;
-
-    // Create output dir
-    std::fs::create_dir_all(&output_dir)
-        .map_err(|e| format!("Cannot create output dir: {}", e))?;
-
-    let format = archive::detect_format(&archive_path).unwrap_or("unknown");
-    let mut files_processed = 0usize;
-    let mut total_size = 0u64;
-
-    // For ZIP files, use zip crate for extraction
-    if format.contains("zip") {
-        let file = std::fs::File::open(&archive_path)
-            .map_err(|e| format!("Cannot open archive: {}", e))?;
-        let mut archive = zip::ZipArchive::new(file)
-            .map_err(|e| format!("Invalid ZIP: {}", e))?;
-
-        for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)
-                .map_err(|e| format!("ZIP entry error: {}", e))?;
-            let out_path = std::path::Path::new(&output_dir).join(entry.name());
-
-            if entry.name().ends_with('/') {
-                std::fs::create_dir_all(&out_path)
-                    .map_err(|e| format!("Create dir error: {}", e))?;
-            } else {
-                if let Some(parent) = out_path.parent() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|e| format!("Create parent dir: {}", e))?;
-                }
-                let mut outfile = std::fs::File::create(&out_path)
-                    .map_err(|e| format!("Create file error: {}", e))?;
-                let bytes = std::io::copy(&mut entry, &mut outfile)
-                    .map_err(|e| format!("Extract error: {}", e))?;
-                total_size += bytes;
-                files_processed += 1;
-            }
-        }
-    } else if format.contains("tar") {
-        // For TAR files
-        let file = std::fs::File::open(&archive_path)
-            .map_err(|e| format!("Cannot open archive: {}", e))?;
-
-        let reader: Box<dyn std::io::Read> = if archive_path.ends_with(".gz") || archive_path.ends_with(".tgz") {
-            Box::new(flate2::read::GzDecoder::new(file))
-        } else if archive_path.ends_with(".bz2") {
-            Box::new(bzip2::read::BzDecoder::new(file))
-        } else if archive_path.ends_with(".xz") {
-            Box::new(xz2::read::XzDecoder::new(file))
-        } else {
-            Box::new(file)
-        };
-
-        let mut archive = tar::Archive::new(reader);
-        for entry_result in archive.entries()
-            .map_err(|e| format!("TAR error: {}", e))?
-        {
-            let mut entry = entry_result.map_err(|e| format!("TAR entry: {}", e))?;
-            let path = entry.path().map_err(|e| format!("TAR path: {}", e))?.to_path_buf();
-            let out_path = std::path::Path::new(&output_dir).join(&path);
-
-            if let Some(parent) = out_path.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("Create dir: {}", e))?;
-            }
-
-            let mut outfile = std::fs::File::create(&out_path)
-                .map_err(|e| format!("Create file: {}", e))?;
-            let bytes = std::io::copy(&mut entry, &mut outfile)
-                .map_err(|e| format!("Extract: {}", e))?;
-            total_size += bytes;
-            files_processed += 1;
-        }
-    } else {
-        // For 7z/RAR — not supported for extraction in this version
-        return Err(format!(
-            "Extraction for {} is not yet supported. Supported: ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ.\n\nArchive contains {} files totaling {} KB. Use the Inspect tab to view contents.",
-            format,
-            entries.len(),
-            entries.iter().map(|e| e.size).sum::<u64>() / 1024
-        ));
-    }
+pub fn extract_archive(
+    archive_path: String,
+    output_dir: String,
+    password: Option<String>,
+) -> Result<OperationResult, String> {
+    let pw = password.as_deref();
+    let (files_processed, total_size) =
+        ysf_core::forensic::extract_archive(&archive_path, &output_dir, pw, None)?;
 
     Ok(OperationResult {
         success: true,
         output_path: output_dir,
         files_processed,
         total_size,
-        message: format!("Extracted {} files ({} KB)", files_processed, total_size / 1024),
+        message: format!("Extracted {files_processed} files ({} KB)", total_size / 1024),
     })
 }
 
@@ -336,6 +338,125 @@ pub fn decrypt_file(path: String, password: String) -> Result<String, String> {
     Ok(out_path)
 }
 
+// ─── Utilities ───
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SourceStat {
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+}
+
+#[tauri::command]
+pub fn stat_paths(paths: Vec<String>) -> Vec<SourceStat> {
+    paths
+        .into_iter()
+        .map(|path| {
+            let meta = std::fs::metadata(&path).ok();
+            SourceStat {
+                path: path.clone(),
+                is_dir: meta.as_ref().map(|m| m.is_dir()).unwrap_or(false),
+                size: meta.map(|m| m.len()).unwrap_or(0),
+            }
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolStatus {
+    pub name: String,
+    pub available: bool,
+}
+
+#[tauri::command]
+pub fn check_tools() -> Vec<ToolStatus> {
+    ysf_core::forensic::rust_backends()
+        .into_iter()
+        .map(|(name, available)| ToolStatus {
+            name: name.to_string(),
+            available,
+        })
+        .collect()
+}
+
+#[tauri::command]
+pub fn hash_file_sha256(path: String) -> Result<String, String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(&path).map_err(|e| format!("Cannot open: {e}"))?;
+    let mut data = Vec::new();
+    file.read_to_end(&mut data).map_err(|e| format!("Read error: {e}"))?;
+    let hashes = ysf_core::hashing::multi_hash_buffer(&data);
+    hashes.sha256.ok_or_else(|| "SHA-256 failed".into())
+}
+
+#[tauri::command]
+pub fn hash_archive(path: String) -> Result<ysf_core::hashing::HashSet, String> {
+    ysf_core::forensic::hash_archive_file(&path)
+}
+
+#[tauri::command]
+pub fn get_progress() -> ysf_core::ProgressState {
+    ysf_core::get_progress()
+}
+
+#[tauri::command]
+pub fn preview_archive_entry(
+    archive_path: String,
+    entry_path: String,
+    password: Option<String>,
+) -> Result<ysf_core::preview::ArchiveEntryPreview, String> {
+    ysf_core::preview::preview_archive_entry(
+        &archive_path,
+        &entry_path,
+        password.as_deref(),
+    )
+}
+
+#[tauri::command]
+pub fn forensic_scan_archive(
+    path: String,
+    password: Option<String>,
+) -> Result<archive::ForensicReport, String> {
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    archive::forensic_scan_archive(&path, password.as_deref(), &cancel)
+        .map_err(|e| format!("Forensic scan failed: {e}"))
+}
+
+#[tauri::command]
+pub fn test_archive_integrity(path: String, password: Option<String>) -> Result<bool, String> {
+    let cancel = std::sync::atomic::AtomicBool::new(false);
+    let report = archive::forensic_scan_archive(&path, password.as_deref(), &cancel)
+        .map_err(|e| e.to_string())?;
+    Ok(matches!(report.risk_label.as_str(), "Clean" | "Low Risk"))
+}
+
+#[tauri::command]
+pub fn extract_archive_entries(
+    archive_path: String,
+    output_dir: String,
+    paths: Vec<String>,
+    password: Option<String>,
+) -> Result<OperationResult, String> {
+    if paths.is_empty() {
+        return Err("No files selected".into());
+    }
+
+    std::fs::create_dir_all(&output_dir)
+        .map_err(|e| format!("Cannot create output dir: {e}"))?;
+
+    let pw = password.as_deref();
+    let (files_processed, total_size) =
+        ysf_core::forensic::extract_archive(&archive_path, &output_dir, pw, Some(&paths))?;
+
+    Ok(OperationResult {
+        success: true,
+        output_path: output_dir,
+        files_processed,
+        total_size,
+        message: format!("Extracted {files_processed} selected files ({} KB)", total_size / 1024),
+    })
+}
+
 // ─── About ───
 
 #[tauri::command]
@@ -343,7 +464,7 @@ pub fn about_info() -> serde_json::Value {
     serde_json::json!({
         "appName": "ZipLoom",
         "version": "0.1.0",
-        "developer": "YSF Studio — Built with ❤️ by Yusuf Shalahuddin",
+        "developer": "YSF Studio — Yusuf Shalahuddin",
         "build": "Master Build — All Features Unlocked",
         "features": [
             "Drag & Drop Archive Compression & Extraction",

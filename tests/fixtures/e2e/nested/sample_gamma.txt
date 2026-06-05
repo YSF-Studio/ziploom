@@ -1,0 +1,2 @@
+Nested folder test file for directory compression.
+Line 2: forensic sample data.

@@ -1,0 +1,3 @@
+ZipLoom E2E Test — Beta Manifest
+Files: alpha, gamma
+Hash placeholder: deadbeefcafebabe

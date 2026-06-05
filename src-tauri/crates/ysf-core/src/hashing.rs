@@ -25,6 +25,7 @@ pub fn multi_hash(path: &Path, cancel_flag: &std::sync::atomic::AtomicBool) -> R
     }
 
     let file = File::open(path).map_err(|e| format!("Cannot open {}: {}", path.display(), e))?;
+    let total = file.metadata().map(|m| m.len()).unwrap_or(0);
     let mut reader = BufReader::with_capacity(HASH_BUFFER_SIZE, file);
 
     let mut md5 = Md5::new();
@@ -32,7 +33,7 @@ pub fn multi_hash(path: &Path, cancel_flag: &std::sync::atomic::AtomicBool) -> R
     let mut sha256 = Sha256::new();
     let mut sha512 = Sha512::new();
     let mut blake3 = Blake3::new();
-
+    let mut processed = 0u64;
     let mut buf = vec![0u8; HASH_BUFFER_SIZE];
     loop {
         if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
@@ -46,6 +47,72 @@ pub fn multi_hash(path: &Path, cancel_flag: &std::sync::atomic::AtomicBool) -> R
         sha256.update(chunk);
         sha512.update(chunk);
         blake3.update(chunk);
+        processed += n as u64;
+        if total > 0 {
+            let pct = (processed as f64 / total as f64) * 100.0;
+            super::progress::update_progress(pct, "Computing hashes…", processed, total);
+        }
+    }
+    if total > 0 {
+        super::progress::update_progress(100.0, "Computing hashes…", total, total);
+    }
+
+    Ok(HashSet {
+        md5: Some(format!("{:x}", md5.finalize())),
+        sha1: Some(format!("{:x}", sha1.finalize())),
+        sha256: Some(format!("{:x}", sha256.finalize())),
+        sha512: Some(format!("{:x}", sha512.finalize())),
+        blake3: Some(blake3.finalize().to_hex().to_string()),
+    })
+}
+
+/// Stream hashes from any reader (optionally including a prefix already read).
+pub fn multi_hash_reader<R: Read + ?Sized>(
+    reader: &mut R,
+    prefix: &[u8],
+    cancel_flag: &std::sync::atomic::AtomicBool,
+    total_size: Option<u64>,
+) -> Result<HashSet, String> {
+    if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
+        return Err("CANCELLED".into());
+    }
+
+    let mut md5 = Md5::new();
+    let mut sha1 = Sha1::new();
+    let mut sha256 = Sha256::new();
+    let mut sha512 = Sha512::new();
+    let mut blake3 = Blake3::new();
+
+    if !prefix.is_empty() {
+        md5.update(prefix);
+        sha1.update(prefix);
+        sha256.update(prefix);
+        sha512.update(prefix);
+        blake3.update(prefix);
+    }
+
+    let mut processed = prefix.len() as u64;
+    let total = total_size.unwrap_or(0).saturating_add(processed);
+    let mut buf = vec![0u8; HASH_BUFFER_SIZE];
+    loop {
+        if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err("CANCELLED".into());
+        }
+        let n = reader.read(&mut buf).map_err(|e| format!("Read error: {e}"))?;
+        if n == 0 {
+            break;
+        }
+        let chunk = &buf[..n];
+        md5.update(chunk);
+        sha1.update(chunk);
+        sha256.update(chunk);
+        sha512.update(chunk);
+        blake3.update(chunk);
+        processed += n as u64;
+        if total > 0 && processed % (HASH_BUFFER_SIZE as u64 * 4) < n as u64 {
+            let pct = (processed as f64 / total as f64) * 100.0;
+            super::progress::update_progress(pct, "Hashing entry…", processed, total);
+        }
     }
 
     Ok(HashSet {

@@ -36,6 +36,30 @@ pub fn is_cancelled() -> bool {
         .as_ref().map(|f| f.load(Ordering::SeqCst)).unwrap_or(false)
 }
 
+/// Reset progress for a new long-running operation.
+pub fn reset_progress(status: &str) {
+    if let Ok(mut p) = super::PROGRESS_STATE.lock() {
+        *p = ProgressState {
+            percent: 0.0,
+            status: status.to_string(),
+            is_done: false,
+            error: None,
+            eta_secs: None,
+            bytes_processed: 0,
+            total_bytes: 0,
+        };
+    }
+    *super::OPERATION_RESULT.lock().unwrap() = None;
+}
+
+/// Read current progress snapshot.
+pub fn get_progress() -> ProgressState {
+    super::PROGRESS_STATE
+        .lock()
+        .map(|p| p.clone())
+        .unwrap_or_default()
+}
+
 /// Update progress state (thread-safe)
 pub fn update_progress(percent: f64, status: &str, bytes: u64, total: u64) {
     if let Ok(mut p) = super::PROGRESS_STATE.lock() {

@@ -12,6 +12,13 @@ use crate::hashing::compute_entropy;
 
 const TEXT_PREVIEW_LIMIT: usize = 50 * 1024;
 const HEX_PREVIEW_LIMIT: usize = 4 * 1024;
+pub const ARCHIVE_PREVIEW_MAX: u64 = 2 * 1024 * 1024;
+pub const ARCHIVE_IMAGE_MAX: u64 = 1 * 1024 * 1024;
+
+const BLOCKED_PREVIEW_EXT: &[&str] = &[
+    "exe", "dll", "sys", "scr", "com", "pif", "msi", "bat", "cmd", "ps1", "vbs", "hta",
+];
+const IMAGE_PREVIEW_EXT: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "bmp", "ico"];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum FileKind {
@@ -40,6 +47,21 @@ pub enum PreviewContent {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArchiveEntryPreview {
+    pub path: String,
+    pub size: u64,
+    pub truncated: bool,
+    /// text | hex | image | blocked
+    pub preview_type: String,
+    pub text: Option<String>,
+    pub hex: Option<String>,
+    pub image_base64: Option<String>,
+    pub mime_type: String,
+    pub warning: Option<String>,
+    pub safe: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileMetadata {
     pub size: u64,
     pub modified: String,
@@ -51,6 +73,118 @@ pub struct FileMetadata {
     pub md5: Option<String>,
     pub sha1: Option<String>,
     pub sha256: Option<String>,
+}
+
+/// Preview a single file inside an archive — read-only, size-capped, no execution.
+pub fn preview_archive_entry(
+    archive_path: &str,
+    entry_path: &str,
+    password: Option<&str>,
+) -> Result<ArchiveEntryPreview, String> {
+    let ext = Path::new(entry_path)
+        .extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+
+    let max = if IMAGE_PREVIEW_EXT.contains(&ext.as_str()) {
+        ARCHIVE_IMAGE_MAX
+    } else {
+        ARCHIVE_PREVIEW_MAX
+    };
+
+    let entry = crate::forensic::read_archive_entry(archive_path, entry_path, password, max)?;
+    let mut warning: Option<String> = None;
+    let mut safe = true;
+
+    if BLOCKED_PREVIEW_EXT.contains(&ext.as_str()) {
+        warning = Some(
+            "Executable/script file — showing hex dump only. Do not extract or run unless you trust the source."
+                .into(),
+        );
+        safe = false;
+        let hex = preview_hex(&entry.data)?;
+        return Ok(ArchiveEntryPreview {
+            path: entry_path.to_string(),
+            size: entry.total_size,
+            truncated: entry.truncated,
+            preview_type: "hex".into(),
+            text: None,
+            hex: match hex {
+                PreviewContent::HexDump(h) => Some(h),
+                _ => None,
+            },
+            image_base64: None,
+            mime_type: mime_for(&ext),
+            warning,
+            safe,
+        });
+    }
+
+    if ext == "svg" {
+        warning = Some("SVG can contain scripts — rendered as plain text, not as image.".into());
+        safe = false;
+    }
+
+    if ext == "html" || ext == "htm" {
+        warning = Some("HTML is shown as plain text only — never rendered in the browser.".into());
+    }
+
+    if IMAGE_PREVIEW_EXT.contains(&ext.as_str()) && ext != "svg" {
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&entry.data);
+        return Ok(ArchiveEntryPreview {
+            path: entry_path.to_string(),
+            size: entry.total_size,
+            truncated: entry.truncated,
+            preview_type: "image".into(),
+            text: None,
+            hex: None,
+            image_base64: Some(b64),
+            mime_type: mime_for(&ext),
+            warning,
+            safe,
+        });
+    }
+
+    let kind = detect_kind(&ext, entry_path);
+    match kind {
+        FileKind::Text => {
+            let text = preview_text(&entry.data)?;
+            Ok(ArchiveEntryPreview {
+                path: entry_path.to_string(),
+                size: entry.total_size,
+                truncated: entry.truncated,
+                preview_type: "text".into(),
+                text: match text {
+                    PreviewContent::Text(t) => Some(t),
+                    _ => None,
+                },
+                hex: None,
+                image_base64: None,
+                mime_type: mime_for(&ext),
+                warning,
+                safe,
+            })
+        }
+        _ => {
+            let hex = preview_hex(&entry.data)?;
+            Ok(ArchiveEntryPreview {
+                path: entry_path.to_string(),
+                size: entry.total_size,
+                truncated: entry.truncated,
+                preview_type: "hex".into(),
+                text: None,
+                hex: match hex {
+                    PreviewContent::HexDump(h) => Some(h),
+                    _ => None,
+                },
+                image_base64: None,
+                mime_type: mime_for(&ext),
+                warning,
+                safe,
+            })
+        }
+    }
 }
 
 pub fn preview_file(path: &str) -> Result<PreviewResult, String> {

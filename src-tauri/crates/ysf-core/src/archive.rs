@@ -4,7 +4,7 @@ use std::io::Read;
 
 pub const FORMATS_SUPPORTED: &[&str] = &["zip", "7z", "rar", "tar", "tar.gz", "tar.bz2", "tar.xz", "tar.zst", "gz", "bz2", "xz", "zst"];
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct FileEntry {
     pub path: String,
     pub size: u64,
@@ -23,7 +23,7 @@ pub struct FileEntry {
     pub detected_type: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct ForensicReport {
     pub archive_path: String,
     pub format: String,
@@ -36,14 +36,14 @@ pub struct ForensicReport {
     pub risk_label: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct Anomaly {
     pub file: String,
     pub issue: String,
     pub severity: String,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct Threat {
     pub file: String,
     pub threat: String,
@@ -83,17 +83,55 @@ pub fn forensic_load(path: &str, password: Option<&str>) -> Result<Vec<FileEntry
     }
 }
 
+pub(crate) fn zip_password_required(err: &zip::result::ZipError) -> bool {
+    matches!(
+        err,
+        zip::result::ZipError::UnsupportedArchive(zip::result::ZipError::PASSWORD_REQUIRED)
+    )
+}
+
+pub(crate) fn map_zip_err(err: zip::result::ZipError) -> String {
+    if zip_password_required(&err) {
+        "PASSWORD_NEEDED".to_string()
+    } else {
+        let msg = format!("{err}");
+        if msg.to_lowercase().contains("password") {
+            "WRONG_PASSWORD".to_string()
+        } else {
+            format!("ZIP read error: {err}")
+        }
+    }
+}
+
+/// Returns true if any entry in a ZIP archive is encrypted.
+pub fn zip_needs_password(path: &str) -> Result<bool, String> {
+    let file = std::fs::File::open(path).map_err(|e| format!("Cannot open: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("ZIP error: {}", e))?;
+    for i in 0..archive.len() {
+        if let Err(e) = archive.by_index(i) {
+            if zip_password_required(&e) {
+                return Ok(true);
+            }
+            return Err(map_zip_err(e));
+        }
+    }
+    Ok(false)
+}
+
 fn load_zip(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String> {
     let file = std::fs::File::open(path).map_err(|e| format!("Cannot open: {}", e))?;
-    let mut archive = if password.is_some() {
-        zip::ZipArchive::new(file).map_err(|_| "PASSWORD_NEEDED".to_string())? // password support varies
-    } else {
-        zip::ZipArchive::new(file).map_err(|e| format!("ZIP error: {}", e))?
-    };
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("ZIP error: {}", e))?;
 
     let mut entries = vec![];
     for i in 0..archive.len() {
-        let entry = archive.by_index(i).map_err(|e| format!("ZIP read error: {}", e))?;
+        let entry = if let Some(pw) = password {
+            archive
+                .by_index_decrypt(i, pw.as_bytes())
+                .map_err(map_zip_err)?
+        } else {
+            archive.by_index(i).map_err(map_zip_err)?
+        };
+        let t = entry.last_modified();
         entries.push(FileEntry {
             path: entry.name().to_string(),
             size: entry.size(),
@@ -102,7 +140,14 @@ fn load_zip(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String
             ratio: if entry.size() > 0 {
                 Some(entry.compressed_size() as f64 / entry.size() as f64)
             } else { None },
-            modified: Some(format!("{:?}", entry.last_modified())),
+            modified: Some(format!(
+                "{}-{:02}-{:02} {:02}:{:02}",
+                t.year(),
+                t.month(),
+                t.day(),
+                t.hour(),
+                t.minute()
+            )),
             permissions: None,
             md5: None, sha1: None, sha256: None,
             entropy: None, magic_match: None,
@@ -120,11 +165,14 @@ fn load_7z(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String>
         len,
         password.unwrap_or("").into(),
     ).map_err(|e| {
-        let msg = format!("{}", e);
-        if msg.contains("password") || msg.contains("Password") {
+        let msg = format!("{e}");
+        let lower = msg.to_lowercase();
+        if lower.contains("password") && (password.is_none() || password == Some("")) {
             "PASSWORD_NEEDED".to_string()
+        } else if lower.contains("password") {
+            "WRONG_PASSWORD".to_string()
         } else {
-            format!("7z error: {}", msg)
+            format!("7z error: {msg}")
         }
     })?;
 
@@ -148,10 +196,39 @@ fn load_7z(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String>
     Ok(entries)
 }
 
-fn load_rar(path: &str, _password: Option<&str>) -> Result<Vec<FileEntry>, String> {
+/// Probe whether a RAR archive requires a password.
+pub fn rar_needs_password(path: &str) -> Result<bool, String> {
     let archive = unrar::Archive::new(path);
+    match archive.open_for_listing() {
+        Ok(_) => Ok(false),
+        Err(e) => {
+            let msg = format!("{e}");
+            if msg.to_lowercase().contains("password") {
+                Ok(true)
+            } else {
+                Err(format!("RAR error: {e}"))
+            }
+        }
+    }
+}
+
+fn load_rar(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String> {
+    let archive = match password {
+        Some(pw) => unrar::Archive::with_password(path, pw.as_bytes()),
+        None => unrar::Archive::new(path),
+    };
     let mut entries = vec![];
-    for entry_result in archive.open_for_listing().map_err(|e| format!("RAR error: {e}"))? {
+    for entry_result in archive.open_for_listing().map_err(|e| {
+        let msg = format!("{e}");
+        let lower = msg.to_lowercase();
+        if lower.contains("password") && password.is_none() {
+            "PASSWORD_NEEDED".to_string()
+        } else if lower.contains("password") {
+            "WRONG_PASSWORD".to_string()
+        } else {
+            format!("RAR error: {e}")
+        }
+    })? {
         let e = entry_result.map_err(|e| format!("RAR read error: {e}"))?;
         entries.push(FileEntry {
             path: e.filename.to_string_lossy().to_string(),
@@ -169,6 +246,21 @@ fn load_rar(path: &str, _password: Option<&str>) -> Result<Vec<FileEntry>, Strin
         });
     }
     Ok(entries)
+}
+
+/// Probe whether an archive needs a password before reading.
+pub fn needs_password(path: &str) -> Result<bool, String> {
+    let fmt = detect_format(path).ok_or_else(|| format!("Unsupported format: {}", path))?;
+    match fmt {
+        "zip" => zip_needs_password(path),
+        "7z" => match forensic_load(path, None) {
+            Err(ref e) if e == "PASSWORD_NEEDED" => Ok(true),
+            Ok(_) => Ok(false),
+            Err(e) => Err(e),
+        },
+        "rar" => rar_needs_password(path),
+        _ => Ok(false),
+    }
 }
 
 fn load_tar(path: &str) -> Result<Vec<FileEntry>, String> {
@@ -208,56 +300,92 @@ fn load_tar(path: &str) -> Result<Vec<FileEntry>, String> {
     Ok(entries)
 }
 
+/// Full forensic scan: read file contents, compute hashes/entropy/magic, detect threats.
+pub fn forensic_scan_archive(
+    path: &str,
+    password: Option<&str>,
+    cancel_flag: &std::sync::atomic::AtomicBool,
+) -> Result<ForensicReport, String> {
+    generate_forensic_report(path, password, cancel_flag)
+}
+
 /// Full forensic report: hash, entropy, magic, threat detection
 pub fn generate_forensic_report(
     path: &str,
     password: Option<&str>,
     cancel_flag: &std::sync::atomic::AtomicBool,
 ) -> Result<ForensicReport, String> {
+    super::progress::reset_progress("Starting forensic scan…");
     let format = detect_format(path).unwrap_or("unknown").to_string();
     let mut entries = forensic_load(path, password)?;
+
+    if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
+        return Err("CANCELLED".into());
+    }
+
+    super::progress::update_progress(5.0, "Reading archive contents…", 0, entries.len() as u64);
+    super::forensic::enrich_entries_content(path, password, &mut entries)?;
 
     let total_size: u64 = entries.iter().map(|e| e.size).sum();
     let mut anomalies: Vec<Anomaly> = vec![];
     let mut threats: Vec<Threat> = vec![];
     let mut risk_score = 0.0f64;
 
-    // For forensic report, we'd extract to temp and analyze
-    // This is a simplified version for the core library
-    // Full implementation uses tempdir extraction + per-file analysis
     let total = entries.len();
-    for (i, entry) in entries.iter_mut().enumerate() {
+    for (i, entry) in entries.iter().enumerate() {
         if cancel_flag.load(std::sync::atomic::Ordering::SeqCst) {
             return Err("CANCELLED".into());
         }
 
         super::progress::update_progress(
-            (i as f64 / total.max(1) as f64) * 100.0,
-            &format!("Scanning {}/{}", i + 1, total),
+            10.0 + (i as f64 / total.max(1) as f64) * 85.0,
+            &format!("Analyzing {}/{}", i + 1, total),
             i as u64,
             total as u64,
         );
 
-        // Basic entropy and magic check without file extraction
-        let _name_lower = entry.path.to_lowercase();
-        let ext = Path::new(&entry.path).extension()
-            .and_then(|e| e.to_str()).unwrap_or("");
+        let ext = Path::new(&entry.path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
 
-        // Threat detection heuristics
         if entry.size == 0 && !entry.is_dir {
             anomalies.push(Anomaly {
                 file: entry.path.clone(),
                 issue: "Zero-byte file (possible deleted/missing content)".into(),
                 severity: "low".into(),
             });
+            risk_score += 0.01;
         }
 
-        // Suspicious extensions
+        if entry.magic_match == Some(false) {
+            let detected = entry.detected_type.clone().unwrap_or_else(|| "unknown".into());
+            threats.push(Threat {
+                file: entry.path.clone(),
+                threat: format!("Magic byte mismatch — detected {detected}"),
+                category: "spoofing".into(),
+                severity: "high".into(),
+                detail: "File content does not match its extension".into(),
+            });
+            risk_score += 0.2;
+        }
+
+        if let Some(ent) = entry.entropy {
+            if ent > 7.5 {
+                anomalies.push(Anomaly {
+                    file: entry.path.clone(),
+                    issue: format!("High entropy ({ent:.2}) — possibly encrypted or compressed payload"),
+                    severity: "medium".into(),
+                });
+                risk_score += 0.08;
+            }
+        }
+
         let suspicious_exts = ["exe", "dll", "sys", "bat", "ps1", "vbs", "js", "hta", "scr", "pif"];
         if suspicious_exts.contains(&ext) {
             threats.push(Threat {
                 file: entry.path.clone(),
-                threat: format!("Executable file: .{}", ext),
+                threat: format!("Executable file: .{ext}"),
                 category: "executable".into(),
                 severity: "medium".into(),
                 detail: "Executable files may contain malicious code".into(),
@@ -265,7 +393,6 @@ pub fn generate_forensic_report(
             risk_score += 0.05;
         }
 
-        // Double extension (e.g., report.pdf.exe)
         let stem = entry.path.rsplitn(2, '.').last().unwrap_or("");
         if stem.contains('.') {
             threats.push(Threat {

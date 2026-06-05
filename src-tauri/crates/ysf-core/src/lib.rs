@@ -14,6 +14,7 @@ pub mod mobile;
 pub mod cloud;
 pub mod network;
 pub mod archive;
+pub mod forensic;
 pub mod ntfs;
 pub mod carving;
 pub mod report;
@@ -21,16 +22,16 @@ pub mod snapshot;
 pub mod preview;
 
 // Re-export commonly used types
-pub use progress::{ProgressState, CancelFlag, set_cancel_flag, is_cancelled};
-pub use hashing::{multi_hash, compute_entropy, check_magic_bytes, HASH_BUFFER_SIZE};
+pub use progress::{ProgressState, CancelFlag, set_cancel_flag, is_cancelled, reset_progress, get_progress};
+pub use hashing::{multi_hash, multi_hash_reader, compute_entropy, check_magic_bytes, HASH_BUFFER_SIZE};
 pub use crypto::{sign_data, verify_signature, generate_keypair, KeypairStore};
 pub use evidence::{EvidenceId, ActionLog, ChainOfCustody, generate_qr_label};
 pub use encryption_detect::{EncryptionReport, FdeType, scan_encryption};
 pub use imaging::{DiskImager, AcquisitionState};
 pub use write_blocker::{enable_write_blocker, disable_write_blocker, check_write_blocker};
 pub use archive::{
-    forensic_load, generate_forensic_report, ForensicReport, FileEntry, Anomaly, Threat,
-    FORMATS_SUPPORTED,
+    forensic_load, forensic_scan_archive, generate_forensic_report, ForensicReport, FileEntry,
+    Anomaly, Threat, FORMATS_SUPPORTED,
 };
 pub use ntfs::{parse_mft, MftEntry, FileAttribute, DeletedFile};
 pub use carving::{carve_files, CarvingResult, CarvedFile, MAGIC_SIGNATURES};
