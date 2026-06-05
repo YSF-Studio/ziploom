@@ -124,12 +124,14 @@ fn compress_zip(
         .map_err(|e| format!("Cannot create output file: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
 
-    let base = SimpleFileOptions::default()
-        .compression_method(zip::CompressionMethod::Deflated);
-    let options = match password {
-        None => base,
+    let password_buf = password.map(str::to_string);
+    let options = match password_buf.as_deref() {
+        None => SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated),
         Some(pw) if pw.is_empty() => return Err("Password cannot be empty".into()),
-        Some(pw) => base.with_aes_encryption(AesMode::Aes256, pw),
+        Some(pw) => SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated)
+            .with_aes_encryption(AesMode::Aes256, pw),
     };
 
     let mut files_processed = 0usize;

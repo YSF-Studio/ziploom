@@ -30,7 +30,7 @@ jobs:
         with:
           toolchain: stable
           cache-workspaces: src-tauri/crates/ysf-core
-      - run: cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml
+      - run: cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml --locked
 
   ziploom:
     name: 📦 ZipLoom
@@ -54,6 +54,6 @@ jobs:
       - name: Build Frontend
         run: npm run build
       - name: Build Rust
-        run: cargo build --manifest-path src-tauri/Cargo.toml
+        run: cargo build --manifest-path src-tauri/Cargo.toml --locked
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked

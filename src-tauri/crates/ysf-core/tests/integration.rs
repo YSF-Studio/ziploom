@@ -28,7 +28,7 @@ fn create_test_zip(zip_path: &Path, src_dir: &Path, _password: Option<&str>) {
 
     let file = File::create(zip_path).unwrap();
     let mut zip = ZipWriter::new(file);
-    let options = zip::write::FileOptions::<zip::write::ExtendedFileOptions>::default()
+    let options = zip::write::SimpleFileOptions::default()
         .compression_method(CompressionMethod::Deflated);
 
     for entry in std::fs::read_dir(src_dir).unwrap() {

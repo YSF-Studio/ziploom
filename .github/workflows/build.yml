@@ -43,13 +43,13 @@ jobs:
         run: npm run build
 
       - name: Test ysf-core
-        run: cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml
+        run: cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml --locked
 
       - name: Build Rust
-        run: cargo build --manifest-path src-tauri/Cargo.toml
+        run: cargo build --manifest-path src-tauri/Cargo.toml --locked
 
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 
   security:
     name: 🔒 Security Audit
