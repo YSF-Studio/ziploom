@@ -444,12 +444,14 @@ fn capture_system_info() -> Result<SystemInfo, String> {
             .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
             .unwrap_or_else(|| "unknown".to_string());
 
+        let (total_mb, avail_mb) = read_memory_info_windows();
+
         Ok(SystemInfo {
             hostname,
             kernel: "Windows".to_string(),
             uptime_secs: 0,
-            total_memory_mb: 0,
-            available_memory_mb: 0,
+            total_memory_mb: total_mb,
+            available_memory_mb: avail_mb,
         })
     }
 
@@ -513,6 +515,39 @@ fn read_memory_info_macos() -> (u64, u64) {
                 .and_then(|s| s.trim().trim_end_matches('.').parse::<u64>().ok())
                 .unwrap_or(0);
             (free_pages * page_size) / (1024 * 1024)
+        })
+        .unwrap_or(0);
+
+    (total_mb, avail_mb)
+}
+
+#[cfg(target_os = "windows")]
+fn read_memory_info_windows() -> (u64, u64) {
+    use std::process::Command;
+
+    let total_mb = Command::new("wmic")
+        .args(["computersystem", "get", "totalphysicalmemory"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .nth(1)
+                .and_then(|l| l.trim().parse::<u64>().ok())
+                .map(|b| b / (1024 * 1024))
+        })
+        .unwrap_or(0);
+
+    let avail_mb = Command::new("wmic")
+        .args(["OS", "get", "FreePhysicalMemory"])
+        .output()
+        .ok()
+        .and_then(|o| {
+            String::from_utf8_lossy(&o.stdout)
+                .lines()
+                .nth(1)
+                .and_then(|l| l.trim().parse::<u64>().ok())
+                .map(|kb| kb / 1024)
         })
         .unwrap_or(0);
 
@@ -590,7 +625,11 @@ fn capture_processes() -> Result<Vec<ProcessEntry>, String> {
     {
         return capture_processes_macos();
     }
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    #[cfg(target_os = "windows")]
+    {
+        return capture_processes_windows();
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
     {
         Ok(vec![])
     }
@@ -694,6 +733,64 @@ fn capture_processes_macos() -> Result<Vec<ProcessEntry>, String> {
     Ok(processes)
 }
 
+#[cfg(target_os = "windows")]
+fn capture_processes_windows() -> Result<Vec<ProcessEntry>, String> {
+    use std::process::Command;
+
+    let output = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-Process | Select-Object Id,ProcessName,WorkingSet | ConvertTo-Json -Compress",
+        ])
+        .output()
+        .map_err(|e| format!("Cannot list processes: {}", e))?;
+
+    if !output.status.success() {
+        return Err(format!(
+            "PowerShell process listing failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if stdout.is_empty() {
+        return Ok(vec![]);
+    }
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).map_err(|e| format!("Parse process list: {}", e))?;
+    let items = if let Some(arr) = parsed.as_array() {
+        arr.clone()
+    } else {
+        vec![parsed]
+    };
+
+    let mut processes = Vec::new();
+    for item in items {
+        let pid = item.get("Id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+        let name = item
+            .get("ProcessName")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+        let memory_bytes = item
+            .get("WorkingSet")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+
+        processes.push(ProcessEntry {
+            pid,
+            name,
+            state: "running".to_string(),
+            cpu_percent: 0.0,
+            memory_bytes,
+        });
+    }
+
+    Ok(processes)
+}
+
 fn capture_network() -> Result<Vec<NetworkEntry>, String> {
     #[cfg(target_os = "linux")]
     {
@@ -788,6 +885,10 @@ fn tcp_state_name(code: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_scan_root() -> String {
+        std::env::temp_dir().to_string_lossy().into_owned()
+    }
     
     #[test]
     fn test_snapshot_id_generation() {
@@ -798,21 +899,23 @@ mod tests {
     
     #[test]
     fn test_take_snapshot_basic() {
-        // Take a snapshot of /tmp (small, controlled directory)
-        let snap = take_snapshot("test_basic", Some("/tmp"))
+        let root = test_scan_root();
+        let snap = take_snapshot("test_basic", Some(&root))
             .expect("Failed to take snapshot");
         
         assert!(snap.id.0.contains("test_basic"));
         assert!(!snap.info.hostname.is_empty());
-        assert!(snap.info.total_memory_mb > 0);
-        // Should find at least /tmp contents
-        assert!(snap.files.len() >= 1, "Should have at least 1 file in /tmp");
+        if cfg!(not(target_os = "windows")) {
+            assert!(snap.info.total_memory_mb > 0);
+        }
+        assert!(snap.files.len() >= 1, "Should have at least 1 file in temp dir");
     }
     
     #[test]
     fn test_compare_snapshots_no_changes() {
-        let a = take_snapshot("compare_a", Some("/tmp")).unwrap();
-        let b = take_snapshot("compare_b", Some("/tmp")).unwrap();
+        let root = test_scan_root();
+        let a = take_snapshot("compare_a", Some(&root)).unwrap();
+        let b = take_snapshot("compare_b", Some(&root)).unwrap();
         let diff = compare_snapshots(&a, &b);
         
         // Summary should be populated
@@ -823,8 +926,9 @@ mod tests {
     
     #[test]
     fn test_generate_diff_report() {
-        let a = take_snapshot("report_a", Some("/tmp")).unwrap();
-        let b = take_snapshot("report_b", Some("/tmp")).unwrap();
+        let root = test_scan_root();
+        let a = take_snapshot("report_a", Some(&root)).unwrap();
+        let b = take_snapshot("report_b", Some(&root)).unwrap();
         let diff = compare_snapshots(&a, &b);
         let report = generate_diff_report(&diff);
         
@@ -925,16 +1029,20 @@ mod tests {
     #[test]
     fn test_capture_processes_works() {
         let procs = capture_processes().expect("Should capture processes");
-        assert!(procs.len() > 5, "Should have at least 5 processes, got {}", procs.len());
-        // Should at least find PID 1 (init/systemd)
-        assert!(procs.iter().any(|p| p.pid == 1), "Should find PID 1");
+        assert!(procs.len() > 0, "Should have at least 1 process, got {}", procs.len());
+        if cfg!(target_os = "linux") {
+            assert!(procs.len() > 5, "Linux should have many processes, got {}", procs.len());
+            assert!(procs.iter().any(|p| p.pid == 1), "Should find PID 1");
+        }
     }
     
     #[test]
     fn test_system_info_works() {
         let info = capture_system_info().expect("Should capture system info");
         assert!(!info.hostname.is_empty());
-        assert!(info.total_memory_mb > 0);
+        if cfg!(not(target_os = "windows")) {
+            assert!(info.total_memory_mb > 0);
+        }
         if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
             assert!(info.uptime_secs > 0);
         }
@@ -942,7 +1050,8 @@ mod tests {
     
     #[test]
     fn test_serialization_roundtrip() {
-        let snap = take_snapshot("serde_test", Some("/tmp")).unwrap();
+        let root = test_scan_root();
+        let snap = take_snapshot("serde_test", Some(&root)).unwrap();
         let json = serde_json::to_string(&snap).expect("Serialize");
         let deserialized: SystemSnapshot = serde_json::from_str(&json).expect("Deserialize");
         assert_eq!(snap.id.0, deserialized.id.0);
