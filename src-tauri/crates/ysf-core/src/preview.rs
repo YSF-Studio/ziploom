@@ -390,7 +390,7 @@ mod tests {
         let zp = dir.join("t.zip");
         let f = std::fs::File::create(&zp).unwrap();
         let mut w = zip::ZipWriter::new(f);
-        w.start_file::<_, ()>("a.txt", zip::write::FileOptions::default()).unwrap();
+        w.start_file("a.txt", zip::write::SimpleFileOptions::default()).unwrap();
         w.write_all(b"data").unwrap();
         w.finish().unwrap();
         let r = preview_file(zp.to_str().unwrap()).unwrap();

@@ -1,6 +1,8 @@
 use chrono::Utc;
-use serde::{Serialize, Deserialize};
+use once_cell::sync::Lazy;
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::Mutex;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvidenceId {
@@ -9,8 +11,11 @@ pub struct EvidenceId {
     pub sequence: u16,     // 0001
 }
 
+static EVIDENCE_COUNTER_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
+
 impl EvidenceId {
     pub fn new(prefix: &str) -> Self {
+        let _guard = EVIDENCE_COUNTER_LOCK.lock().unwrap();
         let date = Utc::now().format("%Y%m%d").to_string();
         // Read counter from ~/.ysf/evidence_counter.json
         let counter_path = dirs_next().unwrap_or_else(|| PathBuf::from("."))
