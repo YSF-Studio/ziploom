@@ -523,28 +523,20 @@ fn read_memory_info_macos() -> (u64, u64) {
 
 #[cfg(target_os = "windows")]
 fn read_memory_info_windows() -> (u64, u64) {
-    use std::process::Command;
+    use std::mem::{size_of, zeroed};
+    use winapi::um::sysinfoapi::{GlobalMemoryStatusEx, MEMORYSTATUSEX};
 
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "$os = Get-CimInstance Win32_OperatingSystem; \
-             [PSCustomObject]@{ TotalMB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1MB); \
-             AvailMB = [math]::Round($os.FreePhysicalMemory / 1024) } | ConvertTo-Json -Compress",
-        ])
-        .output()
-        .ok();
-
-    output
-        .and_then(|o| {
-            let stdout = String::from_utf8_lossy(&o.stdout);
-            let parsed: serde_json::Value = serde_json::from_str(stdout.trim()).ok()?;
-            let total = parsed.get("TotalMB")?.as_u64()?;
-            let avail = parsed.get("AvailMB")?.as_u64()?;
-            Some((total, avail))
-        })
-        .unwrap_or((0, 0))
+    unsafe {
+        let mut status: MEMORYSTATUSEX = zeroed();
+        status.dwLength = size_of::<MEMORYSTATUSEX>() as u32;
+        if GlobalMemoryStatusEx(&mut status) == 0 {
+            return (0, 0);
+        }
+        (
+            status.ullTotalPhys / (1024 * 1024),
+            status.ullAvailPhys / (1024 * 1024),
+        )
+    }
 }
 
 fn format_permissions(metadata: &std::fs::Metadata) -> String {
@@ -730,54 +722,42 @@ fn capture_processes_macos() -> Result<Vec<ProcessEntry>, String> {
 fn capture_processes_windows() -> Result<Vec<ProcessEntry>, String> {
     use std::process::Command;
 
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-Command",
-            "Get-Process | Select-Object Id,ProcessName,WorkingSet | ConvertTo-Json -Compress",
-        ])
+    let output = Command::new("tasklist")
+        .args(["/FO", "CSV", "/NH"])
         .output()
-        .map_err(|e| format!("Cannot list processes: {}", e))?;
+        .map_err(|e| format!("Cannot run tasklist: {}", e))?;
 
     if !output.status.success() {
         return Err(format!(
-            "PowerShell process listing failed: {}",
+            "tasklist failed: {}",
             String::from_utf8_lossy(&output.stderr)
         ));
     }
 
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if stdout.is_empty() {
-        return Ok(vec![]);
-    }
-
-    let parsed: serde_json::Value =
-        serde_json::from_str(&stdout).map_err(|e| format!("Parse process list: {}", e))?;
-    let items = if let Some(arr) = parsed.as_array() {
-        arr.clone()
-    } else {
-        vec![parsed]
-    };
-
     let mut processes = Vec::new();
-    for item in items {
-        let pid = item.get("Id").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-        let name = item
-            .get("ProcessName")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown")
-            .to_string();
-        let memory_bytes = item
-            .get("WorkingSet")
-            .and_then(|v| v.as_u64())
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let mut parts = line.split(',');
+        let name = parts
+            .next()
+            .map(|s| s.trim_matches('"').to_string())
+            .unwrap_or_default();
+        let pid = parts
+            .next()
+            .and_then(|s| s.trim_matches('"').parse::<u32>().ok())
             .unwrap_or(0);
-
+        if pid == 0 && name.is_empty() {
+            continue;
+        }
         processes.push(ProcessEntry {
             pid,
             name,
             state: "running".to_string(),
             cpu_percent: 0.0,
-            memory_bytes,
+            memory_bytes: 0,
         });
     }
 
@@ -902,9 +882,7 @@ mod tests {
         
         assert!(snap.id.0.contains("test_basic"));
         assert!(!snap.info.hostname.is_empty());
-        if cfg!(not(target_os = "windows")) {
-            assert!(snap.info.total_memory_mb > 0);
-        }
+        assert!(snap.info.total_memory_mb > 0);
         assert!(snap.files.len() >= 1, "Should have at least 1 file in temp dir");
     }
     
@@ -1037,9 +1015,7 @@ mod tests {
     fn test_system_info_works() {
         let info = capture_system_info().expect("Should capture system info");
         assert!(!info.hostname.is_empty());
-        if cfg!(not(target_os = "windows")) {
-            assert!(info.total_memory_mb > 0);
-        }
+        assert!(info.total_memory_mb > 0);
         if cfg!(target_os = "linux") || cfg!(target_os = "macos") {
             assert!(info.uptime_secs > 0);
         }

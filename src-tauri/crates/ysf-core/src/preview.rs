@@ -205,7 +205,18 @@ pub fn preview_file(path: &str) -> Result<PreviewResult, String> {
         let dt: chrono::DateTime<chrono::Utc> = t.into();
         dt.format("%Y-%m-%d %H:%M:%S").to_string()
     }).unwrap_or_else(|| "unknown".to_string());
-    let perms = format!("{:o}", std::os::unix::fs::PermissionsExt::mode(&meta.permissions()) & 0o777);
+    let perms = {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            format!("{:o}", meta.permissions().mode() & 0o777)
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = &meta;
+            "000".to_string()
+        }
+    };
     
     let kind = detect_kind(&extension, path);
     let data = std::fs::read(path).unwrap_or_default();
