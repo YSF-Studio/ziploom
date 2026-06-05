@@ -9,3 +9,4 @@ build/
 Thumbs.db
 src-tauri/target/
 src-tauri/crates/ysf-core/target/
+.cargo-local-target/

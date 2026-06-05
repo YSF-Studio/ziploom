@@ -17,7 +17,7 @@ pub fn enable_write_blocker(device: &str) -> Result<(), String> {
             // Can still write — blocker may not be effective
             return Err(format!("Write blocker MAY NOT be active on {} — proceed with caution", device));
         }
-        Ok(())
+        return Ok(());
     }
 
     #[cfg(target_os = "macos")]
@@ -26,7 +26,7 @@ pub fn enable_write_blocker(device: &str) -> Result<(), String> {
         let status = Command::new("diskutil").args(["mountDisk", "readOnly", device])
             .status().map_err(|e| e.to_string())?;
         if !status.success() { return Err("Failed to set read-only mode on macOS".into()); }
-        Ok(())
+        return Ok(());
     }
 
     #[cfg(target_os = "windows")]
@@ -50,7 +50,7 @@ pub fn disable_write_blocker(device: &str) -> Result<(), String> {
         let rw: i32 = 0;
         let ret = unsafe { libc::ioctl(file.as_raw_fd(), 0x0000125D, &rw) };
         if ret != 0 { return Err(format!("BLKROSET clear failed on {}", device)); }
-        Ok(())
+        return Ok(());
     }
 
     #[cfg(target_os = "macos")]
@@ -58,7 +58,7 @@ pub fn disable_write_blocker(device: &str) -> Result<(), String> {
         use std::process::Command;
         Command::new("diskutil").args(["mountDisk", device])
             .status().map_err(|e| e.to_string())?;
-        Ok(())
+        return Ok(());
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos")))]
