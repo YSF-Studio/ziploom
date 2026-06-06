@@ -24,20 +24,7 @@ ZipLoom is a **100% offline** desktop archive utility for compressing, extractin
 
 ## Installation
 
-### Option A — Download a release
-
-1. Open [Releases](https://github.com/YSF-Studio/ziploom/releases).
-2. Pick **installer** or **portable** for your OS:
-
-| Platform | Installer (system-wide) | Portable (no install) |
-|----------|-------------------------|-------------------------|
-| **macOS** | `*_macos_installer.dmg` — drag to Applications | `*_macos_portable.zip` — unzip, double-click `ZipLoom.app` |
-| **Windows** | `*_windows_installer_x64-setup.exe` — run setup wizard | `*_windows_portable_x64.zip` — unzip, run `ziploom.exe` |
-| **Linux** | `*_linux_installer_amd64.deb` — `sudo dpkg -i …` | `*_linux_portable_amd64.AppImage` (recommended) or `*_linux_portable_amd64.tar.gz` |
-
-3. Install or extract using your platform’s usual steps.
-
-### Option B — Build from source
+ZipLoom is distributed as **source code only** — build the app locally on your machine.
 
 **Prerequisites**
 

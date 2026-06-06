@@ -125,16 +125,6 @@ npm run tauri:build
 sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev libpcap-dev
 ```
 
-### Pre-built binaries
-
-Download from [Releases](https://github.com/YSF-Studio/ziploom/releases) — each platform ships an **installer** and a **portable** build:
-
-| Platform | Installer | Portable |
-|----------|-----------|----------|
-| macOS | `.dmg` | `.zip` (`.app`) |
-| Windows | `*-setup.exe` | `.zip` |
-| Linux | `.deb` | `.AppImage` / `.tar.gz` |
-
 ---
 
 ## 🧪 Tests

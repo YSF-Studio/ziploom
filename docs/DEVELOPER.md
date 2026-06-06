@@ -102,9 +102,7 @@ Tauri bundling is enabled in `src-tauri/tauri.conf.json` (`bundle.active: true`)
 | Windows | `nsis` | release exe + DLLs → zipped | `*_windows_installer_x64-setup.exe`, `*_windows_portable_x64.zip` |
 | Linux | `deb` | `appimage` + tar.gz from deb | `*_linux_installer_amd64.deb`, `*_linux_portable_amd64.AppImage` |
 
-`npm run tauri:build` runs `scripts/package-releases.mjs` to copy/rename outputs into `bundle/releases/`.
-
-Tagged releases (`v*`) are published via `.github/workflows/release.yml`. CI matrix uploads `bundle/releases/*` from `build.yml`.
+`npm run tauri:build` runs `scripts/package-releases.mjs` to copy/rename outputs into `bundle/releases/` for local use. Pre-built binaries are **not** published to GitHub Releases.
 
 Linux release links `libc++` for `unrar_sys` — see `src-tauri/.cargo/config.toml`.
 
