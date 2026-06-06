@@ -31,6 +31,40 @@ fn normalize_path(p: &str) -> String {
     p.replace('\\', "/")
 }
 
+/// Validate and join an archive entry name with the output directory.
+/// Rejects absolute paths and parent-directory traversal (zip-slip / CWE-22).
+fn safe_extract_path(output_dir: &str, entry_name: &str) -> Result<PathBuf, String> {
+    let name = normalize_path(entry_name);
+
+    if name.is_empty() {
+        return Err("Empty archive entry path".into());
+    }
+
+    if name.starts_with('/') {
+        return Err(format!("Rejected absolute archive path: {entry_name}"));
+    }
+
+    #[cfg(windows)]
+    if name.contains(':') {
+        return Err(format!("Rejected absolute archive path: {entry_name}"));
+    }
+
+    let path = Path::new(&name);
+    for component in path.components() {
+        match component {
+            std::path::Component::ParentDir => {
+                return Err(format!("Rejected path traversal in archive entry: {entry_name}"));
+            }
+            std::path::Component::RootDir | std::path::Component::Prefix(_) => {
+                return Err(format!("Rejected absolute archive path: {entry_name}"));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(PathBuf::from(output_dir).join(path))
+}
+
 fn find_entry<'a>(entries: &'a mut [FileEntry], path: &str) -> Option<&'a mut FileEntry> {
     let norm = normalize_path(path);
     entries
@@ -490,8 +524,8 @@ fn extract_zip(
         let name = entry.name().to_string();
         if entry.is_dir() {
             if should_extract(&name, selected) {
-                std::fs::create_dir_all(PathBuf::from(output_dir).join(&name))
-                    .map_err(|e| format!("Create dir: {e}"))?;
+                let dir_path = safe_extract_path(output_dir, &name)?;
+                std::fs::create_dir_all(&dir_path).map_err(|e| format!("Create dir: {e}"))?;
             }
             continue;
         }
@@ -501,7 +535,7 @@ fn extract_zip(
             continue;
         }
 
-        let out_path = PathBuf::from(output_dir).join(&name);
+        let out_path = safe_extract_path(output_dir, &name)?;
         if let Some(parent) = out_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
         }
@@ -535,8 +569,8 @@ fn extract_tar(
 
         if entry.header().entry_type().is_dir() {
             if should_extract(&path, selected) {
-                std::fs::create_dir_all(PathBuf::from(output_dir).join(&path))
-                    .map_err(|e| format!("Create dir: {e}"))?;
+                let dir_path = safe_extract_path(output_dir, &path)?;
+                std::fs::create_dir_all(&dir_path).map_err(|e| format!("Create dir: {e}"))?;
             }
             continue;
         }
@@ -546,7 +580,7 @@ fn extract_tar(
             continue;
         }
 
-        let out_path = PathBuf::from(output_dir).join(&path);
+        let out_path = safe_extract_path(output_dir, &path)?;
         if let Some(parent) = out_path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
         }
@@ -578,13 +612,19 @@ fn extract_7z(
         }
     })?;
 
-    let out = PathBuf::from(output_dir);
     let counts = std::cell::RefCell::new((0usize, 0u64));
+    let extract_err = std::cell::RefCell::new(None::<String>);
 
     reader
         .for_each_entries(|entry, reader| {
             let name = entry.name().to_string();
-            let dest = out.join(entry.name());
+            let dest = match safe_extract_path(output_dir, &name) {
+                Ok(p) => p,
+                Err(e) => {
+                    *extract_err.borrow_mut() = Some(e);
+                    return Ok(false);
+                }
+            };
 
             if entry.is_directory() {
                 if should_extract(&name, selected) {
@@ -609,6 +649,10 @@ fn extract_7z(
             Ok(true)
         })
         .map_err(|e| format!("7z extract error: {e}"))?;
+
+    if let Some(e) = extract_err.into_inner() {
+        return Err(e);
+    }
 
     Ok(counts.into_inner())
 }
@@ -642,8 +686,8 @@ fn extract_rar(
         let name = file.entry().filename.to_string_lossy().to_string();
         if file.entry().is_directory() {
             if should_extract(&name, selected) {
-                std::fs::create_dir_all(PathBuf::from(output_dir).join(&name))
-                    .map_err(|e| format!("Create dir: {e}"))?;
+                let dir_path = safe_extract_path(output_dir, &name)?;
+                std::fs::create_dir_all(&dir_path).map_err(|e| format!("Create dir: {e}"))?;
             }
             open = file.skip().map_err(map_rar_err)?;
             continue;
@@ -653,7 +697,11 @@ fn extract_rar(
             continue;
         }
         let size_before = file.entry().unpacked_size;
-        open = file.extract_with_base(output_dir).map_err(map_rar_err)?;
+        let out_path = safe_extract_path(output_dir, &name)?;
+        if let Some(parent) = out_path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("Create dir: {e}"))?;
+        }
+        open = file.extract_to(&out_path).map_err(map_rar_err)?;
         count += 1;
         total += size_before as u64;
     }
@@ -892,4 +940,59 @@ pub fn rust_backends() -> Vec<(&'static str, bool)> {
         ("7z", true),
         ("rar", !cfg!(target_os = "windows")),
     ]
+}
+
+#[cfg(test)]
+mod security_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn tempdir(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("ziploom_sec_{label}_{}", uuid::Uuid::new_v4()))
+    }
+
+    #[test]
+    fn rejects_zip_slip_paths() {
+        let out = "/tmp/safe_output";
+        assert!(safe_extract_path(out, "../etc/passwd").is_err());
+        assert!(safe_extract_path(out, "foo/../../secret.txt").is_err());
+        assert!(safe_extract_path(out, "/absolute/path.txt").is_err());
+        assert!(safe_extract_path(out, "..\\windows\\system32").is_err());
+    }
+
+    #[test]
+    fn allows_safe_nested_paths() {
+        let out = "/tmp/safe_output";
+        let path = safe_extract_path(out, "nested/deep/file.txt").unwrap();
+        assert!(path.ends_with("nested/deep/file.txt"));
+    }
+
+    #[test]
+    fn zip_slip_malicious_archive_blocked() {
+        let dir = tempdir("zip_slip");
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        let zip_path = dir.join("evil.zip");
+        let out_dir = dir.join("extract");
+        std::fs::create_dir_all(&out_dir).unwrap();
+
+        let file = std::fs::File::create(&zip_path).unwrap();
+        let mut zip = zip::ZipWriter::new(file);
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file("../escape.txt", options).unwrap();
+        zip.write_all(b"pwned").unwrap();
+        zip.finish().unwrap();
+
+        let result = extract_zip(
+            zip_path.to_str().unwrap(),
+            out_dir.to_str().unwrap(),
+            None,
+            None,
+        );
+        assert!(result.is_err(), "zip-slip entry must be rejected");
+        assert!(!dir.parent().unwrap().join("escape.txt").exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 }

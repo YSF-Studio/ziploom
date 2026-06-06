@@ -76,11 +76,13 @@ jobs:
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.2/gitleaks_8.24.2_linux_x64.tar.gz | tar -xz
           sudo mv gitleaks /usr/local/bin/
       - name: Run gitleaks
-        continue-on-error: true
         run: gitleaks detect --source . --config .gitleaks.toml --verbose
 
-      - name: Cargo Audit (ysf-core)
-        continue-on-error: true
+      - name: npm audit
+        run: npm audit --audit-level=moderate
+
+      - name: Cargo Audit
         run: |
-          cargo install cargo-audit --locked 2>/dev/null || true
-          cd src-tauri/crates/ysf-core && cargo audit 2>&1 || true
+          cargo install cargo-audit --locked
+          cargo audit --manifest-path src-tauri/crates/ysf-core/Cargo.toml
+          cargo audit --manifest-path src-tauri/Cargo.toml
