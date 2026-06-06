@@ -27,8 +27,15 @@ ZipLoom is a **100% offline** desktop archive utility for compressing, extractin
 ### Option A — Download a release
 
 1. Open [Releases](https://github.com/YSF-Studio/ziploom/releases).
-2. Download the installer for your OS (macOS / Windows / Linux).
-3. Install using your platform’s usual steps.
+2. Pick **installer** or **portable** for your OS:
+
+| Platform | Installer (system-wide) | Portable (no install) |
+|----------|-------------------------|-------------------------|
+| **macOS** | `*_macos_installer.dmg` — drag to Applications | `*_macos_portable.zip` — unzip, double-click `ZipLoom.app` |
+| **Windows** | `*_windows_installer_x64-setup.exe` — run setup wizard | `*_windows_portable_x64.zip` — unzip, run `ziploom.exe` |
+| **Linux** | `*_linux_installer_amd64.deb` — `sudo dpkg -i …` | `*_linux_portable_amd64.AppImage` (recommended) or `*_linux_portable_amd64.tar.gz` |
+
+3. Install or extract using your platform’s usual steps.
 
 ### Option B — Build from source
 
@@ -48,13 +55,13 @@ npm run tauri:dev      # development
 npm run tauri:build    # production installer
 ```
 
-After `npm run tauri:build`, installers are written under `src-tauri/target/release/bundle/`:
+After `npm run tauri:build`, **installer + portable** packages are collected in `src-tauri/target/release/bundle/releases/`:
 
-| Platform | File | Path |
-|----------|------|------|
-| **macOS** | `.dmg` (installer) + `.app` | `bundle/dmg/ZipLoom_*.dmg`, `bundle/macos/ZipLoom.app` |
-| **Windows** | `.exe` (NSIS setup) | `bundle/nsis/ZipLoom_*_x64-setup.exe` |
-| **Linux** | `.deb` + `.AppImage` | `bundle/deb/ZipLoom_*_amd64.deb`, `bundle/appimage/ZipLoom_*_amd64.AppImage` |
+| Platform | Installer | Portable |
+|----------|-----------|----------|
+| **macOS** | `ZipLoom_*_macos_installer.dmg` | `ZipLoom_*_macos_portable.zip` |
+| **Windows** | `ZipLoom_*_windows_installer_x64-setup.exe` | `ZipLoom_*_windows_portable_x64.zip` |
+| **Linux** | `ZipLoom_*_linux_installer_amd64.deb` | `ZipLoom_*_linux_portable_amd64.AppImage` + `.tar.gz` |
 
 > Do **not** use `npm run dev` alone — archive features require the Tauri app (`npm run tauri:dev`).
 

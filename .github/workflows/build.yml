@@ -62,30 +62,26 @@ jobs:
       - name: Build installers
         run: npm run tauri:build
 
-      - name: Upload installers (Linux)
+      - name: Upload releases (Linux)
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v5
         with:
           name: ziploom-linux
-          path: |
-            src-tauri/target/release/bundle/deb/*.deb
-            src-tauri/target/release/bundle/appimage/*.AppImage
+          path: src-tauri/target/release/bundle/releases/*
 
-      - name: Upload installers (macOS)
+      - name: Upload releases (macOS)
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v5
         with:
           name: ziploom-macos
-          path: |
-            src-tauri/target/release/bundle/dmg/*.dmg
-            src-tauri/target/release/bundle/macos/*.app
+          path: src-tauri/target/release/bundle/releases/*
 
-      - name: Upload installers (Windows)
+      - name: Upload releases (Windows)
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v5
         with:
           name: ziploom-windows
-          path: C:\t\release\bundle\nsis\*.exe
+          path: C:\t\release\bundle\releases\*
 
   security:
     name: 🔒 Security Audit

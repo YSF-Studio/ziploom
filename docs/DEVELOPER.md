@@ -94,15 +94,17 @@ E2E temp dirs use per-test unique paths (`AtomicU64` counter) to avoid parallel 
 
 ## Production bundles
 
-Tauri bundling is enabled in `src-tauri/tauri.conf.json` (`bundle.active: true`). Platform targets:
+Tauri bundling is enabled in `src-tauri/tauri.conf.json` (`bundle.active: true`). Each platform builds **installer + portable** artifacts:
 
-| Config | Targets |
-|--------|---------|
-| `tauri.macos.conf.json` | `dmg`, `app` |
-| `tauri.windows.conf.json` | `nsis` |
-| `tauri.linux.conf.json` | `deb`, `appimage` |
+| Platform | Installer target | Portable target | Packaged as |
+|----------|------------------|-----------------|-------------|
+| macOS | `dmg` | `app` → zipped | `*_macos_installer.dmg`, `*_macos_portable.zip` |
+| Windows | `nsis` | release exe + DLLs → zipped | `*_windows_installer_x64-setup.exe`, `*_windows_portable_x64.zip` |
+| Linux | `deb` | `appimage` + tar.gz from deb | `*_linux_installer_amd64.deb`, `*_linux_portable_amd64.AppImage` |
 
-Output directory: `src-tauri/target/release/bundle/`. CI uploads these artifacts from the `build.yml` matrix.
+`npm run tauri:build` runs `scripts/package-releases.mjs` to copy/rename outputs into `bundle/releases/`.
+
+Tagged releases (`v*`) are published via `.github/workflows/release.yml`. CI matrix uploads `bundle/releases/*` from `build.yml`.
 
 Linux release links `libc++` for `unrar_sys` — see `src-tauri/.cargo/config.toml`.
 
