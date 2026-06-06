@@ -468,7 +468,7 @@
           <button class="col-menu-btn" onclick={() => (showColMenu = !showColMenu)}>Columns ▾</button>
           {#if showColMenu}
             <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-            <div class="col-menu" role="menu" onclick={(e) => e.stopPropagation()}>
+            <div class="col-menu" role="menu" tabindex="0" onclick={(e) => e.stopPropagation()}>
               <label><input type="checkbox" bind:checked={showHash} /> Hash</label>
               <label><input type="checkbox" bind:checked={showEntropy} /> Entropy</label>
               <label><input type="checkbox" bind:checked={showMagic} /> Magic</label>
