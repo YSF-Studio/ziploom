@@ -8,7 +8,7 @@
   import ExtractTab from "./lib/components/ExtractTab.svelte";
   import InspectTab from "./lib/components/InspectTab.svelte";
   import AboutTab from "./lib/components/AboutTab.svelte";
-  import { getWindow } from "./lib/tauri.js";
+  import { isTauri, windowAction } from "./lib/tauri.js";
 
   let activeTab = $state(0);
   let toast = $state({ message: "", type: "info" });
@@ -33,13 +33,8 @@
     prefs = savePrefs({ theme: next });
   }
 
-  function windowAction(action) {
-    const win = getWindow();
-    if (!win) return;
-    if (action === "close") win.close();
-    else if (action === "minimize") win.minimize();
-    else if (action === "maximize") win.toggleMaximize();
-  }
+  const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
+  const useNativeMacTitlebar = isMac && isTauri();
 
   function showToast(message, type = "info") {
     toast = { message, type };
@@ -74,12 +69,14 @@
 </script>
 
 <div class="app-shell">
-  <header class="titlebar">
-    <div class="traffic-lights" aria-label="Window controls">
-      <button type="button" class="tl red" aria-label="Close window" onclick={() => windowAction("close")}></button>
-      <button type="button" class="tl yellow" aria-label="Minimize" onclick={() => windowAction("minimize")}></button>
-      <button type="button" class="tl green" aria-label="Maximize" onclick={() => windowAction("maximize")}></button>
-    </div>
+  <header class="titlebar" class:mac-native={useNativeMacTitlebar} data-tauri-drag-region>
+    {#if !useNativeMacTitlebar}
+      <div class="traffic-lights" aria-label="Window controls">
+        <button type="button" class="tl red" aria-label="Close window" onclick={() => windowAction("close")}></button>
+        <button type="button" class="tl yellow" aria-label="Minimize" onclick={() => windowAction("minimize")}></button>
+        <button type="button" class="tl green" aria-label="Maximize" onclick={() => windowAction("maximize")}></button>
+      </div>
+    {/if}
     <div class="brand">
       <Logo size={28} />
       <span class="title">ZipLoom</span>

@@ -34,9 +34,22 @@ export async function writeText(path, contents) {
   return writeTextFile(path, contents);
 }
 
+/** Prefer webview window — required for close/minimize/drag in Tauri v2. */
 export function getWindow() {
   if (!isTauri()) return null;
-  return getCurrentWindow();
+  try {
+    return getCurrentWebviewWindow();
+  } catch {
+    return getCurrentWindow();
+  }
+}
+
+export async function windowAction(action) {
+  const win = getWindow();
+  if (!win) return;
+  if (action === "close") await win.close();
+  else if (action === "minimize") await win.minimize();
+  else if (action === "maximize") await win.toggleMaximize();
 }
 
 export function setupDragDrop(handler) {

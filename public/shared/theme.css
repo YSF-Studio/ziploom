@@ -86,6 +86,10 @@ input:focus, select:focus, textarea:focus {
   height: var(--titlebar-h); padding: 0 16px;
   background: var(--surface); border-bottom: 1px solid var(--border);
   -webkit-app-region: drag;
+  user-select: none;
+}
+.titlebar.mac-native {
+  padding-left: 78px;
 }
 .brand {
   display: flex; align-items: center; gap: 10px;
@@ -129,7 +133,7 @@ input:focus, select:focus, textarea:focus {
 
 .traffic-lights { display: flex; gap: 6px; -webkit-app-region: no-drag; }
 .traffic-lights .tl {
-  width: 12px; height: 12px; border-radius: 50%; padding: 0; border: none; cursor: default;
+  width: 12px; height: 12px; border-radius: 50%; padding: 0; border: none; cursor: pointer;
 }
 .traffic-lights .tl.red { background: #ff5f57; }
 .traffic-lights .tl.yellow { background: #ffbd2e; }

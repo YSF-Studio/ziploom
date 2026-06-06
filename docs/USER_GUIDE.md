@@ -225,6 +225,9 @@ ZIP encryption uses standard **AES-256** — openable in 7-Zip, WinRAR, and ZipL
 | RAR fails on Windows | Use 7z/ZIP, or extract on macOS/Linux |
 | Full Scan is slow | Expected on large archives; watch the progress bar |
 | Linux build fails | Install `libwebkit2gtk-4.1-dev` and GTK deps (see README) |
+| macOS: tombol close/minimize tidak jalan / jendela tidak bisa digeser | `git pull` versi terbaru — macOS memakai traffic light native + `data-tauri-drag-region` |
+| macOS: DMG tidak bisa dibuka (“damaged” / Gatekeeper) | Klik kanan app → **Open**, atau jalankan: `xattr -cr /path/to/ZipLoom.app` |
+| Build installer gagal | Jalankan `npm run tauri:build` (bukan hanya `tauri:dev`); butuh waktu ±10–20 menit pertama kali |
 
 > **Tip:** Run each terminal command on its own line. Do not paste inline `# comments` — zsh may treat them as errors, and npm can forward stray text to `cargo`.
 
