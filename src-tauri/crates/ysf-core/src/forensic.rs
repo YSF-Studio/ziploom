@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 const ENTROPY_SAMPLE: usize = 256 * 1024;
 const MAGIC_SAMPLE: usize = 512;
 /// Files larger than this are spooled to disk for hashing (RAR) instead of loading into RAM.
+#[cfg(not(target_os = "windows"))]
 const MAX_IN_MEMORY: u64 = 8 * 1024 * 1024;
 
 fn file_entry_count(entries: &[FileEntry]) -> usize {
@@ -116,6 +117,7 @@ pub fn enrich_entry_from_bytes(entry: &mut FileEntry, data: &[u8]) {
 }
 
 /// Enrich from a spooled file on disk (streaming hash — any file size).
+#[cfg(not(target_os = "windows"))]
 fn enrich_entry_from_path(entry: &mut FileEntry, path: &Path) -> Result<(), String> {
     if entry.is_dir {
         return Ok(());
