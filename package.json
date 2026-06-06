@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "tauri": "tauri",
-    "tauri:dev": "tauri dev",
+    "tauri:dev": "node scripts/ensure-dist.mjs && tauri dev",
     "tauri:build": "tauri build",
     "test:gui": "npm run build && node tests/gui-smoke.mjs",
     "test:e2e": "cargo test --manifest-path src-tauri/Cargo.toml --test e2e_workflow_test",

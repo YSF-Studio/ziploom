@@ -97,7 +97,21 @@ npm install
 npm run tauri:dev
 ```
 
-Dev server: `http://localhost:1422` — use **`tauri:dev`**, not `npm run dev`, for full archive features.
+`tauri:dev` builds `dist/` automatically on first run (Tauri requires it at compile time). Dev server: `http://localhost:1422` — use **`tauri:dev`**, not `npm run dev`, for full archive features.
+
+### macOS prerequisites
+
+```bash
+xcode-select --install
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+source "$HOME/.nvm/nvm.sh"
+nvm install 22
+nvm use 22
+```
+
+If rustup warns about Homebrew Rust (`/opt/homebrew/bin`), answer `y` to proceed or run `brew uninstall rust`. Run commands **one per line** without trailing `# comments`.
 
 ### Build installer
 

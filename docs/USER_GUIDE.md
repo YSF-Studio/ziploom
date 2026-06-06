@@ -217,11 +217,16 @@ ZIP encryption uses standard **AES-256** — openable in 7-Zip, WinRAR, and ZipL
 
 | Symptom | Solution |
 |---------|----------|
+| `frontendDist` / `../dist` doesn't exist | Run `npm run build` once, or use `npm run tauri:dev` (auto-builds `dist/` on first run) |
 | `invoke` / features fail in browser | Run `npm run tauri:dev`, not `npm run dev` |
+| `zsh: command not found: nvm` | Load nvm: `source ~/.nvm/nvm.sh`, then `nvm install 22 && nvm use 22` |
+| Rust install blocked by Homebrew Rust | Answer `y` to rustup, or `brew uninstall rust` first; ensure `~/.cargo/bin` is before `/opt/homebrew/bin` in `PATH` |
 | Password rejected | Use ZIP format; check password case |
 | RAR fails on Windows | Use 7z/ZIP, or extract on macOS/Linux |
 | Full Scan is slow | Expected on large archives; watch the progress bar |
 | Linux build fails | Install `libwebkit2gtk-4.1-dev` and GTK deps (see README) |
+
+> **Tip:** Run each terminal command on its own line. Do not paste inline `# comments` — zsh may treat them as errors, and npm can forward stray text to `cargo`.
 
 ### Sample files for manual testing
 

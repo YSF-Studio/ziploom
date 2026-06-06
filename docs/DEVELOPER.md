@@ -63,7 +63,7 @@ ziploom/
 
 | Script | Description |
 |--------|-------------|
-| `npm run tauri:dev` | Run desktop app (port 1422) |
+| `npm run tauri:dev` | Run desktop app (port 1422); auto-runs `npm run build` if `dist/` is missing |
 | `npm run tauri:build` | Production installer |
 | `npm run build` | Frontend only (Vite) |
 | `npm run test:e2e` | 7 Rust integration tests |
@@ -82,6 +82,14 @@ cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml --locked
 ```
 
 E2E temp dirs use per-test unique paths (`AtomicU64` counter) to avoid parallel CI races.
+
+## macOS local setup
+
+1. **Xcode Command Line Tools** — `xcode-select --install`
+2. **Rust** — prefer [rustup](https://rustup.rs) over Homebrew `rust`; put `~/.cargo/bin` early in `PATH`
+3. **Node 22+** — nvm: after install, `source ~/.nvm/nvm.sh` (or restart Terminal) before `nvm install 22`
+4. **First dev run** — `npm run tauri:dev` ensures `dist/` exists; without it, `generate_context!()` fails with `frontendDist ... doesn't exist`
+5. **Paste hygiene** — do not append `# comment` on the same line as npm/cargo commands (zsh/npm may pass junk to `cargo run`)
 
 ## CI workflows
 
