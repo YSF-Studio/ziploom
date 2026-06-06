@@ -84,5 +84,7 @@ jobs:
       - name: Cargo Audit
         run: |
           cargo install cargo-audit --locked
-          cargo audit --manifest-path src-tauri/crates/ysf-core/Cargo.toml
-          cargo audit --manifest-path src-tauri/Cargo.toml
+          for dir in src-tauri/crates/ysf-core src-tauri; do
+            echo "=== Auditing $dir ==="
+            (cd "$dir" && cargo audit)
+          done
