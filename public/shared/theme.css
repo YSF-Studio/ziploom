@@ -496,7 +496,7 @@ table.data .mono { font-family: var(--mono); font-size: 10px; }
 .about .disclaimer strong { color: var(--warn); display: block; margin-bottom: 8px; text-align: center; }
 .about .disclaimer p { margin: 0; line-height: 1.6; color: var(--muted); text-align: center; }
 .about .foot { margin-top: 20px; font-size: 13px; color: var(--text); text-align: center; }
-.about .foot.brand { color: var(--accent); font-weight: 600; margin: 4px 0 12px; }
+.about .foot.studio { color: var(--accent); font-weight: 600; margin: 4px 0 12px; }
 .about .link-btn {
   display: inline-block; padding: 6px 18px; border-radius: var(--radius-pill);
   border: 1px solid var(--accent); color: var(--accent); text-decoration: none;

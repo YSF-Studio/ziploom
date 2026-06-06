@@ -43,7 +43,7 @@
   </div>
 
   <p class="foot">Made by Yusuf Shalahuddin Al Ayyubi As Sobari</p>
-  <p class="foot brand">YSF Studio</p>
+  <p class="foot studio">YSF Studio</p>
   <a class="link-btn" href="https://ysfloom.com" target="_blank" rel="noopener noreferrer">ysfloom.com</a>
   <p class="copy">© 2026 YSF Studio — All rights reserved</p>
 </div>
