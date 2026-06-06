@@ -25,7 +25,7 @@ ziploom/
 │   ├── gui-smoke.mjs       # Playwright smoke (mocked IPC)
 │   └── capture-screenshots.mjs
 ├── docs/
-│   ├── PANDUAN.md          # User guide (Indonesian)
+│   ├── USER_GUIDE.md       # User guide (English)
 │   └── DEVELOPER.md        # This file
 └── screenshots/            # README assets
 ```

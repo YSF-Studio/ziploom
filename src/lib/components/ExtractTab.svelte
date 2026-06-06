@@ -47,9 +47,9 @@
   }
 
   async function extract() {
-    if (!archive) return notify(onToast, "Pilih arsip dulu", "error");
+    if (!archive) return notify(onToast, "Select an archive first", "error");
 
-    const dir = await open({ directory: true, multiple: false, title: "Folder tujuan ekstraksi" });
+    const dir = await open({ directory: true, multiple: false, title: "Extraction destination folder" });
     if (!dir) return;
 
     busy = true;

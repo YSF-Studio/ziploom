@@ -8,9 +8,9 @@
 
 > **Archive compression, extraction & forensic inspection** — 100% offline. Built with **Tauri v2 + Rust + Svelte 5**.
 
-| 🇮🇩 Panduan lengkap | 🇬🇧 Developer docs |
-|---------------------|-------------------|
-| [**docs/PANDUAN.md**](docs/PANDUAN.md) — instalasi, setiap tab, password ZIP, troubleshooting | [**docs/DEVELOPER.md**](docs/DEVELOPER.md) — arsitektur, tes, CI, kontribusi |
+| User guide | Developer docs |
+|------------|----------------|
+| [**docs/USER_GUIDE.md**](docs/USER_GUIDE.md) — install, every tab, password ZIP, troubleshooting | [**docs/DEVELOPER.md**](docs/DEVELOPER.md) — architecture, tests, CI, contributing |
 
 ---
 
@@ -71,7 +71,7 @@
 2. Optional: **Full Scan** for hashes, entropy, magic-byte analysis.
 3. Preview files, export CSV, or **Extract Selected**.
 
-→ Step-by-step guide in Indonesian: [**docs/PANDUAN.md**](docs/PANDUAN.md)
+→ Full step-by-step guide: [**docs/USER_GUIDE.md**](docs/USER_GUIDE.md)
 
 ---
 

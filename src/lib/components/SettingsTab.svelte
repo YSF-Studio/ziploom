@@ -29,14 +29,14 @@
 <div class="page">
   <div class="panel">
     <h3>Appearance</h3>
-    <p class="hint">Pilih tema tampilan aplikasi.</p>
+    <p class="hint">Choose the application theme.</p>
     <ThemeSelector value={prefs.theme} onChange={(t) => update({ theme: t })} />
   </div>
 
   <div class="panel">
     <h3>Defaults</h3>
     <div class="row">
-      <label for="def-fmt">Format kompresi</label>
+      <label for="def-fmt">Default compression format</label>
       <select id="def-fmt" value={prefs.defaultFormat} onchange={(e) => update({ defaultFormat: e.currentTarget.value })}>
         <option value="zip">ZIP</option>
         <option value="tar">TAR</option>
@@ -46,7 +46,7 @@
   </div>
 
   <details class="details advanced panel-flat">
-    <summary>Pengaturan lanjutan</summary>
+    <summary>Advanced settings</summary>
     <div class="advanced-body">
       <div class="row">
         <label for="def-level">Default compression level</label>
@@ -67,7 +67,7 @@
           checked={prefs.confirmDestructive}
           onchange={(e) => update({ confirmDestructive: e.currentTarget.checked })}
         />
-        Konfirmasi sebelum aksi destruktif
+        Confirm before destructive actions
       </label>
 
       <div>

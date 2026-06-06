@@ -43,7 +43,7 @@ function mockInitScript(fixture, outDir) {
             if (o.title && o.title.includes('ekstraksi')) return outDir + '/extracted';
             return outDir;
           }
-          if (o.title && o.title.includes('Simpan')) return outDir + '/test_bundle.zip';
+          if (o.title && o.title.includes('Save')) return outDir + '/test_bundle.zip';
           if (o.directory === true) return fixture + '/nested';
           if (o.multiple) {
             return [
@@ -56,7 +56,7 @@ function mockInitScript(fixture, outDir) {
         }
         if (cmd === 'plugin:dialog|save') {
           const dp = args?.options?.defaultPath || '';
-          if (dp.includes('archive') || args?.options?.title?.includes('Simpan')) {
+          if (dp.includes('archive') || args?.options?.title?.includes('Save')) {
             return outDir + '/' + (dp || 'archive.zip');
           }
           return outDir + '/ziploom-inspect.csv';

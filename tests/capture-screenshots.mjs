@@ -39,7 +39,7 @@ function mockInitScript(fixture, samples, outDir) {
         }
         if (cmd === 'plugin:dialog|save') {
           const dp = args?.options?.defaultPath || '';
-          if (dp.includes('archive') || args?.options?.title?.includes('Simpan')) return outDir + '/' + (dp || 'archive.zip');
+          if (dp.includes('archive') || args?.options?.title?.includes('Save')) return outDir + '/' + (dp || 'archive.zip');
           return outDir + '/ziploom-inspect.csv';
         }
         if (cmd === 'plugin:fs|write_text_file') return true;

@@ -8,28 +8,28 @@ export { isTauri };
 
 export async function invoke(cmd, args = {}) {
   if (!isTauri()) {
-    throw new Error("Fitur ini hanya tersedia di aplikasi ZipLoom. Jalankan: npm run tauri:dev");
+    throw new Error("This feature is only available in the ZipLoom app. Run: npm run tauri:dev");
   }
   return tauriInvoke(cmd, args);
 }
 
 export async function open(options) {
   if (!isTauri()) {
-    throw new Error("Dialog file hanya tersedia di aplikasi ZipLoom. Jalankan: npm run tauri:dev");
+    throw new Error("File dialogs are only available in the ZipLoom app. Run: npm run tauri:dev");
   }
   return tauriOpen(options);
 }
 
 export async function save(options) {
   if (!isTauri()) {
-    throw new Error("Dialog simpan hanya tersedia di aplikasi ZipLoom. Jalankan: npm run tauri:dev");
+    throw new Error("Save dialogs are only available in the ZipLoom app. Run: npm run tauri:dev");
   }
   return tauriSave(options);
 }
 
 export async function writeText(path, contents) {
   if (!isTauri()) {
-    throw new Error("Menulis file hanya tersedia di aplikasi ZipLoom. Jalankan: npm run tauri:dev");
+    throw new Error("Writing files is only available in the ZipLoom app. Run: npm run tauri:dev");
   }
   return writeTextFile(path, contents);
 }

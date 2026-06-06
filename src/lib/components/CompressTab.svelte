@@ -70,31 +70,31 @@
   }
 
   async function compress() {
-    if (!sources.length) return notify(onToast, "Tambahkan file atau folder dulu", "error");
+    if (!sources.length) return notify(onToast, "Add files or folders first", "error");
     const fmt = formats.find((f) => f.value === format);
-    if (fmt && !fmt.ok) return notify(onToast, `Format ${format} belum didukung untuk kompresi`, "error");
-    if (usePassword && !password) return notify(onToast, "Masukkan password", "error");
+    if (fmt && !fmt.ok) return notify(onToast, `Format ${format} is not supported for compression`, "error");
+    if (usePassword && !password) return notify(onToast, "Enter a password", "error");
 
     const paths = filterSources(
       sources.map((s) => s.path),
       ".DS_Store\n__MACOSX",
       { cleanMacMeta: cleanMac, includeHidden: false }
     );
-    if (!paths.length) return notify(onToast, "Semua item terfilter", "error");
+    if (!paths.length) return notify(onToast, "All items were filtered out", "error");
 
     busy = true;
     onBusy?.(true);
     result = null;
     try {
       const output = await save({
-        title: "Simpan arsip sebagai",
+        title: "Save archive as",
         defaultPath: `archive.${format}`,
         filters: saveFilters(format),
       });
       if (!output) return;
 
       if (usePassword && format !== "zip") {
-        return notify(onToast, "Password hanya didukung untuk format ZIP", "error");
+        return notify(onToast, "Password protection is only supported for ZIP", "error");
       }
 
       const res = await invoke("compress_files", {
@@ -177,10 +177,10 @@
     </div>
 
     {#if format === "zip" && usePassword}
-      <div class="info-banner">ZIP berpassword AES-256 — bisa dibuka di 7-Zip, WinRAR, dan alat arsip umum</div>
+      <div class="info-banner">AES-256 password ZIP — compatible with 7-Zip, WinRAR, and common archive tools</div>
     {/if}
     {#if format !== "zip" && usePassword}
-      <div class="info-banner warn">Password hanya tersedia untuk format ZIP</div>
+      <div class="info-banner warn">Password protection is only available for ZIP</div>
     {/if}
 
     <div class="slider-row">

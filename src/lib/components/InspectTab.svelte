@@ -171,7 +171,7 @@
   }
 
   async function inspect() {
-    if (!archive) return notify(onToast, "Pilih arsip dulu", "error");
+    if (!archive) return notify(onToast, "Select an archive first", "error");
     busy = true;
     onBusy?.(true);
     info = null;
@@ -248,7 +248,7 @@
   }
 
   async function exportCsv() {
-    if (!info) return notify(onToast, "Inspect arsip dulu", "error");
+    if (!info) return notify(onToast, "Inspect an archive first", "error");
     try {
       const path = await save({
         defaultPath: "ziploom-inspect.csv",
@@ -267,10 +267,10 @@
   }
 
   async function extractSelected() {
-    if (!archive) return notify(onToast, "Pilih arsip dulu", "error");
+    if (!archive) return notify(onToast, "Select an archive first", "error");
     const paths = [...selected];
-    if (!paths.length) return notify(onToast, "Pilih file dulu (checkbox)", "error");
-    const dir = await open({ directory: true, multiple: false, title: "Folder tujuan ekstraksi" });
+    if (!paths.length) return notify(onToast, "Select files first (checkbox)", "error");
+    const dir = await open({ directory: true, multiple: false, title: "Extraction destination folder" });
     if (!dir) return;
     busy = true;
     onBusy?.(true);
