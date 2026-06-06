@@ -238,11 +238,9 @@ async function run() {
       pass(`Tab ${tab} switches`);
     }
 
-    // ── Settings ──
-    await page.locator(".icon-btn").click();
-    await page.waitForSelector(".settings-modal");
-    await page.locator(".settings-modal .btn-secondary").click();
-    pass("Settings modal opens");
+    // ── Theme toggle ──
+    await page.locator(".theme-toggle-btn").click();
+    pass("Theme toggle cycles");
 
     // ── Compress ──
     await tabstrip.getByRole("button", { name: "Compress", exact: true }).click();

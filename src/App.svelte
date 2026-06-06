@@ -3,7 +3,6 @@
   import { getPrefs, savePrefs } from "./lib/prefs.js";
   import { setupDragDrop } from "./lib/tauri.js";
   import Logo from "./lib/Logo.svelte";
-  import ThemeSelector from "./lib/components/ThemeSelector.svelte";
   import Toast from "./lib/components/Toast.svelte";
   import CompressTab from "./lib/components/CompressTab.svelte";
   import ExtractTab from "./lib/components/ExtractTab.svelte";
@@ -15,8 +14,6 @@
   let toast = $state({ message: "", type: "info" });
   let busy = $state(false);
   let prefs = $state(getPrefs());
-  let showSettings = $state(false);
-
   let compressRef = $state(null);
   let extractRef = $state(null);
   let inspectRef = $state(null);
@@ -117,11 +114,6 @@
         {/if}
         <span>{themeLabels[prefs.theme] ?? prefs.theme}</span>
       </button>
-      <button class="icon-btn" onclick={() => (showSettings = true)} aria-label="Settings" title="Settings">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
-          <circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
-        </svg>
-      </button>
     </div>
   </header>
 
@@ -146,21 +138,3 @@
 </div>
 
 <Toast message={toast.message} type={toast.type} onClose={() => (toast = { message: "", type: "info" })} />
-
-{#if showSettings}
-  <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_static_element_interactions -->
-  <div class="settings-overlay" role="presentation" onclick={() => (showSettings = false)}>
-    <div class="settings-modal" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()}>
-      <h3>Settings</h3>
-      <p style="margin:0 0 8px;font-size:13px;color:var(--muted)">Appearance &amp; defaults</p>
-      <p style="margin:0 0 10px;font-size:12px;font-weight:600;color:var(--text)">Theme</p>
-      <ThemeSelector
-        value={prefs.theme}
-        onChange={(t) => { prefs = savePrefs({ theme: t }); }}
-      />
-      <div class="close-row">
-        <button class="btn-secondary" onclick={() => (showSettings = false)}>Close</button>
-      </div>
-    </div>
-  </div>
-{/if}
