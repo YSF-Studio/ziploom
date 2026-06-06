@@ -1,0 +1,6 @@
+# unrar_sys C++ objects are built with libc++; link it on Linux release builds.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-lc++", "-C", "link-arg=-lc++abi"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-lc++", "-C", "link-arg=-lc++abi"]

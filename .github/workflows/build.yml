@@ -56,11 +56,36 @@ jobs:
       - name: Test ysf-core
         run: cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml --locked -- --test-threads=2
 
-      - name: Build Rust
-        run: cargo build --manifest-path src-tauri/Cargo.toml --locked
-
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+
+      - name: Build installers
+        run: npm run tauri:build
+
+      - name: Upload installers (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v5
+        with:
+          name: ziploom-linux
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/appimage/*.AppImage
+
+      - name: Upload installers (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v5
+        with:
+          name: ziploom-macos
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/macos/*.app
+
+      - name: Upload installers (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v5
+        with:
+          name: ziploom-windows
+          path: C:\t\release\bundle\nsis\*.exe
 
   security:
     name: 🔒 Security Audit

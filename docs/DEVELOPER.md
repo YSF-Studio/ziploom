@@ -64,7 +64,8 @@ ziploom/
 | Script | Description |
 |--------|-------------|
 | `npm run tauri:dev` | Run desktop app (port 1422); auto-runs `npm run build` if `dist/` is missing |
-| `npm run tauri:build` | Production installer |
+| `npm run tauri:build` | Production installer (DMG / NSIS / deb / AppImage) |
+| `npm run icons` | Regenerate `src-tauri/icons/*` from `logo.svg` |
 | `npm run build` | Frontend only (Vite) |
 | `npm run test:e2e` | 7 Rust integration tests |
 | `npm run test:gui` | 15 Playwright UI smoke tests |
@@ -90,6 +91,20 @@ E2E temp dirs use per-test unique paths (`AtomicU64` counter) to avoid parallel 
 3. **Node 22+** — nvm: after install, `source ~/.nvm/nvm.sh` (or restart Terminal) before `nvm install 22`
 4. **First dev run** — `npm run tauri:dev` ensures `dist/` exists; without it, `generate_context!()` fails with `frontendDist ... doesn't exist`
 5. **Paste hygiene** — do not append `# comment` on the same line as npm/cargo commands (zsh/npm may pass junk to `cargo run`)
+
+## Production bundles
+
+Tauri bundling is enabled in `src-tauri/tauri.conf.json` (`bundle.active: true`). Platform targets:
+
+| Config | Targets |
+|--------|---------|
+| `tauri.macos.conf.json` | `dmg`, `app` |
+| `tauri.windows.conf.json` | `nsis` |
+| `tauri.linux.conf.json` | `deb`, `appimage` |
+
+Output directory: `src-tauri/target/release/bundle/`. CI uploads these artifacts from the `build.yml` matrix.
+
+Linux release links `libc++` for `unrar_sys` — see `src-tauri/.cargo/config.toml`.
 
 ## CI workflows
 

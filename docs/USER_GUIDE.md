@@ -48,6 +48,14 @@ npm run tauri:dev      # development
 npm run tauri:build    # production installer
 ```
 
+After `npm run tauri:build`, installers are written under `src-tauri/target/release/bundle/`:
+
+| Platform | File | Path |
+|----------|------|------|
+| **macOS** | `.dmg` (installer) + `.app` | `bundle/dmg/ZipLoom_*.dmg`, `bundle/macos/ZipLoom.app` |
+| **Windows** | `.exe` (NSIS setup) | `bundle/nsis/ZipLoom_*_x64-setup.exe` |
+| **Linux** | `.deb` + `.AppImage` | `bundle/deb/ZipLoom_*_amd64.deb`, `bundle/appimage/ZipLoom_*_amd64.AppImage` |
+
 > Do **not** use `npm run dev` alone — archive features require the Tauri app (`npm run tauri:dev`).
 
 ---
@@ -227,6 +235,7 @@ ZIP encryption uses standard **AES-256** — openable in 7-Zip, WinRAR, and ZipL
 | Linux build fails | Install `libwebkit2gtk-4.1-dev` and GTK deps (see README) |
 | macOS: tombol close/minimize tidak jalan / jendela tidak bisa digeser | `git pull` versi terbaru — macOS memakai traffic light native + `data-tauri-drag-region` |
 | macOS: DMG tidak bisa dibuka (“damaged” / Gatekeeper) | Klik kanan app → **Open**, atau jalankan: `xattr -cr /path/to/ZipLoom.app` |
+| Build installer gagal / bukan file `.dmg`/`.exe`/`.deb` | Pakai `npm run tauri:build` (bukan `cargo build` saja). Cek folder `src-tauri/target/release/bundle/` — jika kosong, pastikan `bundle.active: true` di `tauri.conf.json` dan ikon ada di `src-tauri/icons/` (`npm run icons` dari `logo.svg`) |
 | Build installer gagal | Jalankan `npm run tauri:build` (bukan hanya `tauri:dev`); butuh waktu ±10–20 menit pertama kali |
 
 > **Tip:** Run each terminal command on its own line. Do not paste inline `# comments` — zsh may treat them as errors, and npm can forward stray text to `cargo`.
