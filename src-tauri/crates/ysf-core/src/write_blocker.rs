@@ -31,12 +31,15 @@ pub fn enable_write_blocker(device: &str) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        // Windows: DeviceIoControl(FSCTL_LOCK_VOLUME) + FSCTL_SET_READ_ONLY_MODE
+        let _ = device;
         Err("Windows write blocker requires administrator elevation via GUI".into())
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-    { Err("Unsupported platform".into()) }
+    {
+        let _ = device;
+        Err("Unsupported platform".into())
+    }
 }
 
 /// Disable write blocker
@@ -61,8 +64,17 @@ pub fn disable_write_blocker(device: &str) -> Result<(), String> {
         return Ok(());
     }
 
-    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-    { Err("Unsupported platform".into()) }
+    #[cfg(target_os = "windows")]
+    {
+        let _ = device;
+        Err("Windows write blocker requires administrator elevation via GUI".into())
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
+    {
+        let _ = device;
+        Err("Unsupported platform".into())
+    }
 }
 
 /// Check if write blocker is currently active

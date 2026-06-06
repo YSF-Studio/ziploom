@@ -197,6 +197,12 @@ fn load_7z(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String>
 }
 
 /// Probe whether a RAR archive requires a password.
+#[cfg(target_os = "windows")]
+pub fn rar_needs_password(_path: &str) -> Result<bool, String> {
+    Ok(false)
+}
+
+#[cfg(not(target_os = "windows"))]
 pub fn rar_needs_password(path: &str) -> Result<bool, String> {
     let archive = unrar::Archive::new(path);
     match archive.open_for_listing() {
@@ -212,6 +218,12 @@ pub fn rar_needs_password(path: &str) -> Result<bool, String> {
     }
 }
 
+#[cfg(target_os = "windows")]
+fn load_rar(_path: &str, _password: Option<&str>) -> Result<Vec<FileEntry>, String> {
+    Err("RAR format is not supported on Windows".into())
+}
+
+#[cfg(not(target_os = "windows"))]
 fn load_rar(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String> {
     let archive = match password {
         Some(pw) => unrar::Archive::with_password(path, pw.as_bytes()),

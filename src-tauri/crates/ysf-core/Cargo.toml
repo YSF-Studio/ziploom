@@ -27,7 +27,6 @@ bzip2 = "0.4"
 xz2 = "0.1"
 zstd = "0.13"
 sevenz-rust = { version = "0.6", features = ["aes256"] }
-unrar = "0.5"
 tempfile = "3"
 reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
 tokio = { version = "1", features = ["full"] }
@@ -41,6 +40,9 @@ crc32fast = "1"
 aes-gcm = "0.10"
 pbkdf2 = { version = "0.12", features = ["simple"] }
 hmac = "0.12"
+
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+unrar = "0.5"
 
 [target.'cfg(unix)'.dependencies]
 pcap = "2"

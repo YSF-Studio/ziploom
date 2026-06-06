@@ -38,6 +38,7 @@ fn find_entry<'a>(entries: &'a mut [FileEntry], path: &str) -> Option<&'a mut Fi
         .find(|e| normalize_path(&e.path) == norm)
 }
 
+#[cfg(not(target_os = "windows"))]
 fn map_rar_err(e: unrar::error::UnrarError) -> String {
     let msg = format!("{e}");
     if msg.to_lowercase().contains("password") {
@@ -327,6 +328,12 @@ fn enrich_7z(path: &str, password: Option<&str>, entries: &mut [FileEntry]) -> R
     Ok(())
 }
 
+#[cfg(target_os = "windows")]
+fn enrich_rar(_path: &str, _password: Option<&str>, _entries: &mut [FileEntry]) -> Result<(), String> {
+    Err("RAR format is not supported on Windows".into())
+}
+
+#[cfg(not(target_os = "windows"))]
 fn enrich_rar(path: &str, password: Option<&str>, entries: &mut [FileEntry]) -> Result<(), String> {
     let archive = match password {
         Some(pw) => unrar::Archive::with_password(path, pw.as_bytes()),
@@ -606,6 +613,17 @@ fn extract_7z(
     Ok(counts.into_inner())
 }
 
+#[cfg(target_os = "windows")]
+fn extract_rar(
+    _archive_path: &str,
+    _output_dir: &str,
+    _selected: Option<&[String]>,
+    _password: Option<&str>,
+) -> Result<(usize, u64), String> {
+    Err("RAR format is not supported on Windows".into())
+}
+
+#[cfg(not(target_os = "windows"))]
 fn extract_rar(
     archive_path: &str,
     output_dir: &str,
@@ -810,6 +828,17 @@ fn read_7z_entry(
         .ok_or_else(|| format!("Entry not found: {entry_path}"))
 }
 
+#[cfg(target_os = "windows")]
+fn read_rar_entry(
+    _archive_path: &str,
+    _entry_path: &str,
+    _password: Option<&str>,
+    _max_bytes: u64,
+) -> Result<EntryBytes, String> {
+    Err("RAR format is not supported on Windows".into())
+}
+
+#[cfg(not(target_os = "windows"))]
 fn read_rar_entry(
     archive_path: &str,
     entry_path: &str,
@@ -861,6 +890,6 @@ pub fn rust_backends() -> Vec<(&'static str, bool)> {
         ("zip", true),
         ("tar", true),
         ("7z", true),
-        ("rar", true),
+        ("rar", !cfg!(target_os = "windows")),
     ]
 }

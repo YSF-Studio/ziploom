@@ -23,7 +23,10 @@ jobs:
       - name: Configure short Cargo target dir (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: echo "CARGO_TARGET_DIR=C:\zt" >> $env:GITHUB_ENV
+        run: |
+          echo "CARGO_TARGET_DIR=C:\t" >> $env:GITHUB_ENV
+          echo "CARGO_INCREMENTAL=0" >> $env:GITHUB_ENV
+          echo "RUSTFLAGS=-C debuginfo=0" >> $env:GITHUB_ENV
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
