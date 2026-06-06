@@ -1,7 +1,10 @@
 <script>
+  import { onMount } from "svelte";
   import Logo from "../Logo.svelte";
+  import { invoke } from "../tauri.js";
 
-  const features = [
+  let version = $state("0.1.0");
+  let features = $state([
     "8 formats: ZIP · TAR · GZ · BZ2 · XZ · Zstandard — compress & extract",
     "7z & RAR — pure Rust extract (sevenz-rust, unrar crate)",
     "Password-protected ZIP (AES-256, 7-Zip / WinRAR compatible)",
@@ -10,7 +13,19 @@
     "Entropy scanning & anomaly detection",
     "Batch hashing (MD5, SHA-1, SHA-256)",
     "100% offline · zero data collection",
-  ];
+  ]);
+
+  onMount(async () => {
+    try {
+      const info = await invoke("about_info");
+      if (info?.version) version = info.version;
+      if (Array.isArray(info?.features) && info.features.length) {
+        features = info.features;
+      }
+    } catch (err) {
+      console.error("[AboutTab] about_info failed:", err);
+    }
+  });
 </script>
 
 <div class="about">
@@ -18,7 +33,7 @@
     <Logo size={72} />
   </div>
   <h1>ZipLoom</h1>
-  <p class="ver">Version 1.0</p>
+  <p class="ver">Version {version}</p>
   <p class="tag">Archive Utility &amp; Forensic Inspector</p>
   <p class="sub">Pure Rust · Offline · Private</p>
 

@@ -140,9 +140,9 @@ npm run screenshots   # Regenerate README screenshots
 | Suite | Coverage |
 |-------|----------|
 | E2E (Rust) | 7/7 — compress → inspect → extract, password ZIP roundtrip |
-| GUI smoke | 15/15 — tabs, theme toggle, compress, extract, inspect scan/hash/export |
+| GUI smoke | 16/16 — tabs, theme toggle, compress, extract, inspect scan/hash/export, no console errors |
 
-CI runs on **ubuntu**, **macos**, and **windows** on every push to `main`.
+CI runs on **ubuntu**, **macos**, and **windows** on every push to `main`, including Playwright GUI smoke tests on Ubuntu.
 
 ---
 

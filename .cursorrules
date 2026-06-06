@@ -1,0 +1,30 @@
+# Aturan Pengembangan Tauri & Rust — ZipLoom
+
+## IPC (Rust ↔ Frontend)
+
+1. **Registrasi IPC wajib:** Setiap fungsi `#[tauri::command]` HARUS ditambahkan ke `tauri::generate_handler![...]` di `src-tauri/src/lib.rs`. Jangan biarkan command tidak terdaftar.
+2. **Serde & penamaan:** JavaScript memakai camelCase, Rust memakai snake_case. Struct yang dikirim ke/dari frontend WAJIB `#[derive(Serialize, Deserialize)]` + `#[serde(rename_all = "camelCase")]`.
+3. **Jangan blokir UI:** Operasi I/O file, komputasi berat (ZIP, forensic scan, hash), atau network WAJIB `async fn` dengan `tauri::async_runtime::spawn_blocking` — logika sync di fungsi `*_sync`.
+4. **Penanganan error:** Jangan `.unwrap()` / `.expect()` di dalam command. Selalu kembalikan `Result<T, String>`.
+5. **Frontend invoke:** Semua panggilan lewat `src/lib/tauri.js` — wrapper sudah memiliki `try/catch` + `console.error`. Jangan panggil `@tauri-apps/api/core` `invoke` langsung dari komponen.
+
+## Debugging
+
+- Saat app berjalan: klik kanan → Inspect Element, atau `Cmd+Option+I` (Mac) / `Ctrl+Shift+I` (Win/Linux).
+- Cek tab **Console** untuk error merah seperti `command 'xxx' not found` (command belum didaftarkan di handler).
+
+## Testing
+
+- Rust E2E: `npm run test:e2e` — workflow compress/inspect/extract.
+- GUI smoke: `npm run test:gui` — Playwright + mock IPC; gagal jika ada console error.
+- Full suite: `npm run test:all`.
+
+## File penting
+
+| Area | Path |
+|------|------|
+| Commands | `src-tauri/src/commands.rs` |
+| Handler registry | `src-tauri/src/lib.rs` |
+| IPC wrapper | `src/lib/tauri.js` |
+| GUI tests | `tests/gui-smoke.mjs` |
+| Playwright config | `playwright.config.mjs` |

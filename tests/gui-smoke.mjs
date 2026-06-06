@@ -13,8 +13,13 @@ const FIXTURE = path.join(ROOT, "tests/fixtures/e2e");
 const OUT = path.join("/tmp", `ziploom-gui-${process.pid}`);
 
 const results = [];
+const consoleErrors = [];
 const pass = (name) => results.push({ name, ok: true });
 const fail = (name, err) => results.push({ name, ok: false, err: String(err) });
+
+function isBenignConsoleError(text) {
+  return /favicon\.ico/i.test(text);
+}
 
 function mockInitScript(fixture, outDir) {
   return `
@@ -181,6 +186,17 @@ function mockInitScript(fixture, outDir) {
             { name: 'tar', available: true }
           ];
         }
+        if (cmd === 'about_info') {
+          return {
+            appName: 'ZipLoom',
+            version: '0.1.0',
+            features: [
+              'Drag & Drop Archive Compression & Extraction',
+              'Multi-format Support: ZIP, TAR, GZ, BZ2, XZ, 7Z, RAR'
+            ],
+            offline: true
+          };
+        }
         throw new Error('Unhandled invoke: ' + cmd);
       }
     };
@@ -224,6 +240,13 @@ async function run() {
 
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
+    page.on("console", (msg) => {
+      if (msg.type() === "error") {
+        const text = msg.text();
+        if (!isBenignConsoleError(text)) consoleErrors.push(text);
+      }
+    });
+    page.on("pageerror", (err) => consoleErrors.push(err.message));
     await page.addInitScript(mockInitScript(FIXTURE, OUT));
     await page.goto("http://localhost:1422/", { waitUntil: "networkidle" });
 
@@ -291,6 +314,12 @@ async function run() {
     await page.waitForSelector(".about h1", { text: "ZipLoom" });
     await page.waitForSelector(".about .disclaimer");
     pass("About page renders");
+
+    if (consoleErrors.length) {
+      fail("No console errors", consoleErrors.join(" | "));
+    } else {
+      pass("No console errors");
+    }
 
   } catch (e) {
     fail("GUI smoke", e);

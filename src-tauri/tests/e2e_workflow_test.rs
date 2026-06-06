@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use ziploom_lib::commands::{
-    about_info, compress_files, decrypt_file, encrypt_file, extract_archive, inspect_archive,
-    supported_formats,
+    about_info, compress_files_sync, decrypt_file_sync, encrypt_file_sync, extract_archive_sync,
+    inspect_archive_sync, supported_formats,
 };
 
 fn fixture_root() -> PathBuf {
@@ -56,7 +56,7 @@ fn e2e_compress_inspect_extract_zip() {
     let archive = out_dir.join("test_bundle.zip");
     let extract_dir = out_dir.join("extracted_zip");
 
-    let result = compress_files(
+    let result = compress_files_sync(
         source_paths(),
         archive.to_string_lossy().into_owned(),
         "zip".into(),
@@ -67,13 +67,13 @@ fn e2e_compress_inspect_extract_zip() {
     assert!(archive.exists());
     assert!(result.files_processed >= 3);
 
-    let info = inspect_archive(archive.to_string_lossy().into_owned(), None).expect("inspect zip");
+    let info = inspect_archive_sync(archive.to_string_lossy().into_owned(), None).expect("inspect zip");
     assert_eq!(info.format.to_lowercase(), "zip");
     assert!(info.total_files >= 3);
     assert!(info.total_size > 0);
     assert!(!info.entries.is_empty());
 
-    let extracted = extract_archive(
+    let extracted = extract_archive_sync(
         archive.to_string_lossy().into_owned(),
         extract_dir.to_string_lossy().into_owned(),
         None,
@@ -93,7 +93,7 @@ fn e2e_compress_inspect_extract_tar() {
     let archive = out_dir.join("test_bundle.tar");
     let extract_dir = out_dir.join("extracted_tar");
 
-    compress_files(
+    compress_files_sync(
         source_paths(),
         archive.to_string_lossy().into_owned(),
         "tar".into(),
@@ -101,10 +101,10 @@ fn e2e_compress_inspect_extract_tar() {
     )
     .expect("compress tar");
 
-    let info = inspect_archive(archive.to_string_lossy().into_owned(), None).expect("inspect tar");
+    let info = inspect_archive_sync(archive.to_string_lossy().into_owned(), None).expect("inspect tar");
     assert!(info.format.to_lowercase().contains("tar"));
 
-    extract_archive(
+    extract_archive_sync(
         archive.to_string_lossy().into_owned(),
         extract_dir.to_string_lossy().into_owned(),
         None,
@@ -120,7 +120,7 @@ fn e2e_compress_inspect_extract_targz() {
     let archive = out_dir.join("test_bundle.tar.gz");
     let extract_dir = out_dir.join("extracted_targz");
 
-    compress_files(
+    compress_files_sync(
         source_paths(),
         archive.to_string_lossy().into_owned(),
         "tar.gz".into(),
@@ -128,10 +128,10 @@ fn e2e_compress_inspect_extract_targz() {
     )
     .expect("compress tar.gz");
 
-    let info = inspect_archive(archive.to_string_lossy().into_owned(), None).expect("inspect tar.gz");
+    let info = inspect_archive_sync(archive.to_string_lossy().into_owned(), None).expect("inspect tar.gz");
     assert!(info.total_files >= 1);
 
-    extract_archive(
+    extract_archive_sync(
         archive.to_string_lossy().into_owned(),
         extract_dir.to_string_lossy().into_owned(),
         None,
@@ -149,7 +149,7 @@ fn e2e_encrypt_decrypt_roundtrip() {
     fs::write(&source, b"TOP SECRET - ZipLoom encryption test payload.").unwrap();
 
     let encrypted_path =
-        encrypt_file(source.to_string_lossy().into_owned(), "TestPass123!".into())
+        encrypt_file_sync(source.to_string_lossy().into_owned(), "TestPass123!".into())
             .expect("encrypt file");
     assert!(Path::new(&encrypted_path).exists());
     assert_ne!(
@@ -158,7 +158,7 @@ fn e2e_encrypt_decrypt_roundtrip() {
     );
 
     let decrypted_path =
-        decrypt_file(encrypted_path, "TestPass123!".into()).expect("decrypt file");
+        decrypt_file_sync(encrypted_path, "TestPass123!".into()).expect("decrypt file");
     assert_eq!(
         fs::read_to_string(decrypted_path).unwrap(),
         "TOP SECRET - ZipLoom encryption test payload."
@@ -172,7 +172,7 @@ fn e2e_compress_password_protected_zip() {
     let extract_dir = out_dir.join("extracted_secure");
     let pw = "TestPass123!";
 
-    compress_files(
+    compress_files_sync(
         source_paths(),
         archive.to_string_lossy().into_owned(),
         "zip".into(),
@@ -181,17 +181,17 @@ fn e2e_compress_password_protected_zip() {
     .expect("compress password zip");
     assert!(archive.exists());
 
-    let err = inspect_archive(archive.to_string_lossy().into_owned(), None).unwrap_err();
+    let err = inspect_archive_sync(archive.to_string_lossy().into_owned(), None).unwrap_err();
     assert!(
         err.contains("PASSWORD_NEEDED") || err.to_lowercase().contains("password"),
         "expected password error, got: {err}"
     );
 
-    let info = inspect_archive(archive.to_string_lossy().into_owned(), Some(pw.into()))
+    let info = inspect_archive_sync(archive.to_string_lossy().into_owned(), Some(pw.into()))
         .expect("inspect password zip");
     assert!(info.total_files >= 3);
 
-    extract_archive(
+    extract_archive_sync(
         archive.to_string_lossy().into_owned(),
         extract_dir.to_string_lossy().into_owned(),
         Some(pw.into()),
@@ -202,7 +202,7 @@ fn e2e_compress_password_protected_zip() {
 
 #[test]
 fn e2e_inspect_rejects_missing_archive() {
-    let err = inspect_archive("/nonexistent/missing.zip".into(), None).unwrap_err();
+    let err = inspect_archive_sync("/nonexistent/missing.zip".into(), None).unwrap_err();
     let lower = err.to_lowercase();
     assert!(
         lower.contains("failed") || lower.contains("read") || lower.contains("cannot open"),

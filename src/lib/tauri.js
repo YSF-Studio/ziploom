@@ -10,7 +10,12 @@ export async function invoke(cmd, args = {}) {
   if (!isTauri()) {
     throw new Error("This feature is only available in the ZipLoom app. Run: npm run tauri:dev");
   }
-  return tauriInvoke(cmd, args);
+  try {
+    return await tauriInvoke(cmd, args);
+  } catch (err) {
+    console.error(`[ZipLoom IPC] ${cmd} failed:`, err);
+    throw err;
+  }
 }
 
 export async function open(options) {

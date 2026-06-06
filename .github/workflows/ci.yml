@@ -62,5 +62,11 @@ jobs:
       - name: Test Rust
         run: cargo test --manifest-path src-tauri/Cargo.toml --locked
 
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: GUI smoke tests
+        run: npm run test:gui
+
       - name: npm audit
         run: npm audit --audit-level=moderate

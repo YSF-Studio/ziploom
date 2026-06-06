@@ -68,7 +68,7 @@ ziploom/
 | `npm run icons` | Regenerate `src-tauri/icons/*` from `logo.svg` |
 | `npm run build` | Frontend only (Vite) |
 | `npm run test:e2e` | 7 Rust integration tests |
-| `npm run test:gui` | 15 Playwright UI smoke tests |
+| `npm run test:gui` | 16 Playwright UI smoke tests (incl. console error check) |
 | `npm run test:all` | E2E + GUI |
 | `npm run screenshots` | Regenerate `screenshots/*.png` |
 
@@ -83,6 +83,34 @@ cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml --locked
 ```
 
 E2E temp dirs use per-test unique paths (`AtomicU64` counter) to avoid parallel CI races.
+
+## Debugging Tauri (DevTools)
+
+While the app runs (`npm run tauri:dev`):
+
+1. **Right-click** the window → **Inspect Element**, or press `Cmd+Option+I` (macOS) / `Ctrl+Shift+I` (Windows/Linux).
+2. Open the **Console** tab.
+3. Look for red errors — common ones:
+   - `command 'xxx' not found` → command missing from `generate_handler!` in `lib.rs`
+   - `[ZipLoom IPC] xxx failed:` → logged by `src/lib/tauri.js` wrapper
+
+Project rules for AI assistants live in `.cursorrules` at the repo root.
+
+## GUI testing (Playwright)
+
+`tests/gui-smoke.mjs` launches Vite preview, mocks Tauri IPC, and asserts:
+
+- All tabs render and primary flows work (compress, extract, inspect, about)
+- **No console errors** during the run
+
+```bash
+npm run test:gui    # after npm run build
+npm run test:all    # Rust E2E + GUI
+```
+
+CI (`ci.yml`) runs `test:gui` on every push to `main`.
+
+Heavy Tauri commands run on a background thread via `spawn_blocking` — see `run_blocking()` in `commands.rs`. Sync implementations are `*_sync` and used by Rust E2E tests.
 
 ## macOS local setup
 
@@ -110,7 +138,7 @@ Linux release links `libc++` for `unrar_sys` — see `src-tauri/.cargo/config.to
 
 | Workflow | Trigger | Jobs |
 |----------|---------|------|
-| `ci.yml` | push/PR `main` | Secret scan (gitleaks CLI), ysf-core tests, ZipLoom build+test |
+| `ci.yml` | push/PR `main` | Secret scan, ysf-core tests, ZipLoom build+test, **GUI smoke** |
 | `build.yml` | push/PR `main` | Matrix: ubuntu / macos / windows |
 | `audit.yml` | schedule + Cargo changes | `cargo audit`, SBOM |
 

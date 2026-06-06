@@ -1,8 +1,19 @@
 use serde::{Deserialize, Serialize};
 use ysf_core::archive;
 
+async fn run_blocking<F, T>(f: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(f)
+        .await
+        .map_err(|e| format!("Task failed: {e}"))?
+}
+
 /// Represents an entry in an archive
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ArchiveEntry {
     pub path: String,
     pub size: u64,
@@ -13,6 +24,7 @@ pub struct ArchiveEntry {
 
 /// Result of inspecting an archive
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ArchiveInfo {
     pub format: String,
     pub entries: Vec<ArchiveEntry>,
@@ -42,12 +54,11 @@ pub fn supported_formats() -> Vec<String> {
 // ─── Inspect Archive ───
 
 #[tauri::command]
-pub fn archive_needs_password(path: String) -> Result<bool, String> {
-    archive::needs_password(&path)
+pub async fn archive_needs_password(path: String) -> Result<bool, String> {
+    run_blocking(move || archive::needs_password(&path)).await
 }
 
-#[tauri::command]
-pub fn inspect_archive(path: String, password: Option<String>) -> Result<ArchiveInfo, String> {
+pub fn inspect_archive_sync(path: String, password: Option<String>) -> Result<ArchiveInfo, String> {
     let pw = password.as_deref();
     let entries = archive::forensic_load(&path, pw).map_err(|e| {
         if e == "PASSWORD_NEEDED" || e == "WRONG_PASSWORD" {
@@ -84,10 +95,14 @@ pub fn inspect_archive(path: String, password: Option<String>) -> Result<Archive
     })
 }
 
+#[tauri::command]
+pub async fn inspect_archive(path: String, password: Option<String>) -> Result<ArchiveInfo, String> {
+    run_blocking(move || inspect_archive_sync(path, password)).await
+}
+
 // ─── Compress Files ───
 
-#[tauri::command]
-pub fn compress_files(
+pub fn compress_files_sync(
     sources: Vec<String>,
     output: String,
     format: String,
@@ -109,6 +124,16 @@ pub fn compress_files(
         "tar.zst" | "tzst" | "zstd" => compress_tar(&sources, &output, "zstd"),
         _ => Err(format!("Unsupported format: {format}")),
     }
+}
+
+#[tauri::command]
+pub async fn compress_files(
+    sources: Vec<String>,
+    output: String,
+    format: String,
+    password: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || compress_files_sync(sources, output, format, password)).await
 }
 
 fn add_sources_to_zip<'a, W: std::io::Write + std::io::Seek>(
@@ -303,8 +328,7 @@ fn compress_tar(sources: &[String], output: &str, variant: &str) -> Result<Opera
 
 // ─── Extract Archive (pure Rust: zip / tar / sevenz-rust / unrar crate) ───
 
-#[tauri::command]
-pub fn extract_archive(
+pub fn extract_archive_sync(
     archive_path: String,
     output_dir: String,
     password: Option<String>,
@@ -322,10 +346,18 @@ pub fn extract_archive(
     })
 }
 
+#[tauri::command]
+pub async fn extract_archive(
+    archive_path: String,
+    output_dir: String,
+    password: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || extract_archive_sync(archive_path, output_dir, password)).await
+}
+
 // ─── AES-256 Encryption ───
 
-#[tauri::command]
-pub fn encrypt_file(path: String, password: String) -> Result<String, String> {
+pub fn encrypt_file_sync(path: String, password: String) -> Result<String, String> {
     let data = std::fs::read(&path)
         .map_err(|e| format!("Cannot read file: {e}"))?;
     let encrypted = ysf_core::crypto::aes_encrypt(&data, &password)?;
@@ -336,7 +368,11 @@ pub fn encrypt_file(path: String, password: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn decrypt_file(path: String, password: String) -> Result<String, String> {
+pub async fn encrypt_file(path: String, password: String) -> Result<String, String> {
+    run_blocking(move || encrypt_file_sync(path, password)).await
+}
+
+pub fn decrypt_file_sync(path: String, password: String) -> Result<String, String> {
     let encrypted = std::fs::read(&path)
         .map_err(|e| format!("Cannot read file: {e}"))?;
     let decrypted = ysf_core::crypto::aes_decrypt(&encrypted, &password)?;
@@ -350,9 +386,15 @@ pub fn decrypt_file(path: String, password: String) -> Result<String, String> {
     Ok(out_path)
 }
 
+#[tauri::command]
+pub async fn decrypt_file(path: String, password: String) -> Result<String, String> {
+    run_blocking(move || decrypt_file_sync(path, password)).await
+}
+
 // ─── Utilities ───
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SourceStat {
     pub path: String,
     pub is_dir: bool,
@@ -391,8 +433,7 @@ pub fn check_tools() -> Vec<ToolStatus> {
         .collect()
 }
 
-#[tauri::command]
-pub fn hash_file_sha256(path: String) -> Result<String, String> {
+pub fn hash_file_sha256_sync(path: String) -> Result<String, String> {
     use std::io::Read;
     let mut file = std::fs::File::open(&path).map_err(|e| format!("Cannot open: {e}"))?;
     let mut data = Vec::new();
@@ -402,8 +443,17 @@ pub fn hash_file_sha256(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn hash_archive(path: String) -> Result<ysf_core::hashing::HashSet, String> {
+pub async fn hash_file_sha256(path: String) -> Result<String, String> {
+    run_blocking(move || hash_file_sha256_sync(path)).await
+}
+
+pub fn hash_archive_sync(path: String) -> Result<ysf_core::hashing::HashSet, String> {
     ysf_core::forensic::hash_archive_file(&path)
+}
+
+#[tauri::command]
+pub async fn hash_archive(path: String) -> Result<ysf_core::hashing::HashSet, String> {
+    run_blocking(move || hash_archive_sync(path)).await
 }
 
 #[tauri::command]
@@ -411,8 +461,7 @@ pub fn get_progress() -> ysf_core::ProgressState {
     ysf_core::get_progress()
 }
 
-#[tauri::command]
-pub fn preview_archive_entry(
+pub fn preview_archive_entry_sync(
     archive_path: String,
     entry_path: String,
     password: Option<String>,
@@ -425,7 +474,15 @@ pub fn preview_archive_entry(
 }
 
 #[tauri::command]
-pub fn forensic_scan_archive(
+pub async fn preview_archive_entry(
+    archive_path: String,
+    entry_path: String,
+    password: Option<String>,
+) -> Result<ysf_core::preview::ArchiveEntryPreview, String> {
+    run_blocking(move || preview_archive_entry_sync(archive_path, entry_path, password)).await
+}
+
+pub fn forensic_scan_archive_sync(
     path: String,
     password: Option<String>,
 ) -> Result<archive::ForensicReport, String> {
@@ -435,7 +492,14 @@ pub fn forensic_scan_archive(
 }
 
 #[tauri::command]
-pub fn test_archive_integrity(path: String, password: Option<String>) -> Result<bool, String> {
+pub async fn forensic_scan_archive(
+    path: String,
+    password: Option<String>,
+) -> Result<archive::ForensicReport, String> {
+    run_blocking(move || forensic_scan_archive_sync(path, password)).await
+}
+
+pub fn test_archive_integrity_sync(path: String, password: Option<String>) -> Result<bool, String> {
     let cancel = std::sync::atomic::AtomicBool::new(false);
     let report = archive::forensic_scan_archive(&path, password.as_deref(), &cancel)
         .map_err(|e| e.to_string())?;
@@ -443,7 +507,11 @@ pub fn test_archive_integrity(path: String, password: Option<String>) -> Result<
 }
 
 #[tauri::command]
-pub fn extract_archive_entries(
+pub async fn test_archive_integrity(path: String, password: Option<String>) -> Result<bool, String> {
+    run_blocking(move || test_archive_integrity_sync(path, password)).await
+}
+
+pub fn extract_archive_entries_sync(
     archive_path: String,
     output_dir: String,
     paths: Vec<String>,
@@ -467,6 +535,16 @@ pub fn extract_archive_entries(
         total_size,
         message: format!("Extracted {files_processed} selected files ({} KB)", total_size / 1024),
     })
+}
+
+#[tauri::command]
+pub async fn extract_archive_entries(
+    archive_path: String,
+    output_dir: String,
+    paths: Vec<String>,
+    password: Option<String>,
+) -> Result<OperationResult, String> {
+    run_blocking(move || extract_archive_entries_sync(archive_path, output_dir, paths, password)).await
 }
 
 // ─── About ───
