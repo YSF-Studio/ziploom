@@ -67,9 +67,10 @@ ziploom/
 | `npm run tauri:build` | Production installer (DMG / NSIS / deb / AppImage) |
 | `npm run icons` | Regenerate `src-tauri/icons/*` from `logo.svg` |
 | `npm run build` | Frontend only (Vite) |
-| `npm run test:e2e` | 7 Rust integration tests |
-| `npm run test:gui` | 16 Playwright UI smoke tests (incl. console error check) |
-| `npm run test:all` | E2E + GUI |
+| `npm run test:ipc` | Static check: frontend `invoke()` ⊆ `generate_handler!` |
+| `npm run test:e2e` | 12 Rust integration tests (workflow + IPC registry) |
+| `npm run test:gui` | 20 Playwright UI smoke tests (incl. console error check) |
+| `npm run test:all` | IPC + E2E + GUI |
 | `npm run screenshots` | Regenerate `screenshots/*.png` |
 
 ## Rust tests

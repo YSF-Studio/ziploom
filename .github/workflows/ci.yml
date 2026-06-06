@@ -59,8 +59,11 @@ jobs:
         run: npm run build
       - name: Build Rust
         run: cargo build --manifest-path src-tauri/Cargo.toml --locked
+      - name: IPC coverage check
+        run: npm run test:ipc
+
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+        run: cargo test --manifest-path src-tauri/Cargo.toml --tests --locked
 
       - name: Install Playwright Chromium
         run: npx playwright install chromium --with-deps

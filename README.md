@@ -139,8 +139,9 @@ npm run screenshots   # Regenerate README screenshots
 
 | Suite | Coverage |
 |-------|----------|
-| E2E (Rust) | 7/7 — compress → inspect → extract, password ZIP roundtrip |
-| GUI smoke | 16/16 — tabs, theme toggle, compress, extract, inspect scan/hash/export, no console errors |
+| IPC coverage | Static — all frontend `invoke()` commands registered in Rust |
+| E2E (Rust) | 12/12 — compress/inspect/extract, forensic scan, hash, preview, IPC registry |
+| GUI smoke | 20/20 — tabs, password ZIP, preview, about centering, no console errors |
 
 CI runs on **ubuntu**, **macos**, and **windows** on every push to `main`, including Playwright GUI smoke tests on Ubuntu.
 

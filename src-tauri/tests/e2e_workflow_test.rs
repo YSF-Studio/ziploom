@@ -3,8 +3,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use ziploom_lib::commands::{
-    about_info, compress_files_sync, decrypt_file_sync, encrypt_file_sync, extract_archive_sync,
-    inspect_archive_sync, supported_formats,
+    about_info, compress_files_sync, decrypt_file_sync, encrypt_file_sync,
+    extract_archive_entries_sync, extract_archive_sync, forensic_scan_archive_sync,
+    hash_archive_sync, inspect_archive_sync, preview_archive_entry_sync, stat_paths,
+    supported_formats,
 };
 
 fn fixture_root() -> PathBuf {
@@ -208,4 +210,70 @@ fn e2e_inspect_rejects_missing_archive() {
         lower.contains("failed") || lower.contains("read") || lower.contains("cannot open"),
         "expected missing-file error, got: {err}"
     );
+}
+
+#[test]
+fn e2e_forensic_scan_and_hash_zip() {
+    let out_dir = temp_output_dir();
+    let archive = out_dir.join("scan_target.zip");
+
+    compress_files_sync(
+        source_paths(),
+        archive.to_string_lossy().into_owned(),
+        "zip".into(),
+        None,
+    )
+    .expect("compress for scan");
+
+    let report = forensic_scan_archive_sync(archive.to_string_lossy().into_owned(), None)
+        .expect("forensic scan");
+    assert!(report.total_files >= 3);
+    assert!(!report.entries.is_empty());
+
+    let hashes = hash_archive_sync(archive.to_string_lossy().into_owned()).expect("hash archive");
+    assert!(hashes.sha256.is_some());
+}
+
+#[test]
+fn e2e_preview_and_extract_selected_entries() {
+    let out_dir = temp_output_dir();
+    let archive = out_dir.join("partial.zip");
+    let extract_dir = out_dir.join("partial_out");
+
+    compress_files_sync(
+        source_paths(),
+        archive.to_string_lossy().into_owned(),
+        "zip".into(),
+        None,
+    )
+    .expect("compress for partial extract");
+
+    let preview = preview_archive_entry_sync(
+        archive.to_string_lossy().into_owned(),
+        "sample_alpha.txt".into(),
+        None,
+    )
+    .expect("preview entry");
+    assert_eq!(preview.path, "sample_alpha.txt");
+    assert!(preview.safe);
+
+    let result = extract_archive_entries_sync(
+        archive.to_string_lossy().into_owned(),
+        extract_dir.to_string_lossy().into_owned(),
+        vec!["sample_alpha.txt".into()],
+        None,
+    )
+    .expect("extract selected");
+    assert!(result.success);
+    assert!(extract_dir.join("sample_alpha.txt").exists());
+}
+
+#[test]
+fn e2e_stat_paths_returns_metadata() {
+    let root = fixture_root();
+    let alpha = root.join("sample_alpha.txt");
+    let stats = stat_paths(vec![alpha.to_string_lossy().into_owned()]);
+    assert_eq!(stats.len(), 1);
+    assert!(!stats[0].is_dir);
+    assert!(stats[0].size > 0);
 }

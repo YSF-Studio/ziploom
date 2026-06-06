@@ -56,8 +56,11 @@ jobs:
       - name: Test ysf-core
         run: cargo test --manifest-path src-tauri/crates/ysf-core/Cargo.toml --locked -- --test-threads=2
 
+      - name: IPC coverage check
+        run: npm run test:ipc
+
       - name: Test Rust
-        run: cargo test --manifest-path src-tauri/Cargo.toml --locked
+        run: cargo test --manifest-path src-tauri/Cargo.toml --tests --locked
 
       - name: Build Rust
         run: cargo build --manifest-path src-tauri/Cargo.toml --locked

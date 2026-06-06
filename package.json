@@ -12,8 +12,9 @@
     "package:releases": "node scripts/package-releases.mjs",
     "icons": "tauri icon src-tauri/icons/logo.svg -o src-tauri/icons",
     "test:gui": "npm run build && node tests/gui-smoke.mjs",
-    "test:e2e": "cargo test --manifest-path src-tauri/Cargo.toml --test e2e_workflow_test",
-    "test:all": "npm run test:e2e && npm run test:gui",
+    "test:ipc": "node tests/ipc-coverage.mjs",
+    "test:e2e": "cargo test --manifest-path src-tauri/Cargo.toml --tests --locked",
+    "test:all": "npm run test:ipc && npm run test:e2e && npm run test:gui",
     "screenshots": "npm run build && node tests/capture-screenshots.mjs"
   },
   "dependencies": {

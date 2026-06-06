@@ -281,6 +281,12 @@ async function run() {
     await page.waitForSelector(".toast.success", { timeout: 5000 });
     pass("Compress: compress action shows success toast");
 
+    await page.locator("#pw").check();
+    await page.locator('input[type="password"]').fill("TestPass123!");
+    await page.locator(".compress-page .btn-cta").click();
+    await page.waitForSelector(".toast.success", { timeout: 5000 });
+    pass("Compress: password-protected ZIP works");
+
     // ── Extract ──
     await tabstrip.getByRole("button", { name: "Extract", exact: true }).click();
     await page.locator(".extract-page .dropzone-lg").click();
@@ -297,6 +303,12 @@ async function run() {
     await page.locator(".inspect-page .inspect-table td.name", { hasText: "sample_alpha.txt" }).first().waitFor({ timeout: 5000 });
     pass("Inspect: archive loads table");
 
+    await page.locator(".inspect-table tr[data-path='sample_alpha.txt']").click();
+    await page.locator(".btn-preview").waitFor({ timeout: 5000 });
+    await page.locator(".btn-preview").click();
+    await page.waitForSelector(".preview-section h4", { hasText: "Preview" });
+    pass("Inspect: entry preview works");
+
     await page.locator(".inspect-page .action-chip", { hasText: "Full Scan" }).click();
     await page.waitForSelector(".toast.success", { timeout: 5000 });
     pass("Inspect: full scan works");
@@ -309,11 +321,28 @@ async function run() {
     await page.waitForSelector(".toast.success", { timeout: 5000 });
     pass("Inspect: export CSV works");
 
+    await page.locator(".inspect-page .seg-control button", { hasText: "Flat" }).click();
+    pass("Inspect: flat view toggle works");
+
     // ── About ──
     await tabstrip.getByRole("button", { name: "About", exact: true }).click();
     await page.waitForSelector(".about h1", { text: "ZipLoom" });
     await page.waitForSelector(".about .disclaimer");
+    await page.waitForSelector(".about .ver", { hasText: "0.1.0" });
     pass("About page renders");
+
+    const studio = page.locator(".about .foot.studio");
+    await studio.waitFor();
+    const studioBox = await studio.boundingBox();
+    const aboutBox = await page.locator(".about").boundingBox();
+    if (studioBox && aboutBox) {
+      const studioCenter = studioBox.x + studioBox.width / 2;
+      const aboutCenter = aboutBox.x + aboutBox.width / 2;
+      if (Math.abs(studioCenter - aboutCenter) < 40) pass("About: YSF Studio centered");
+      else fail("About: YSF Studio centered", `offset ${Math.abs(studioCenter - aboutCenter)}px`);
+    } else {
+      pass("About: YSF Studio visible");
+    }
 
     if (consoleErrors.length) {
       fail("No console errors", consoleErrors.join(" | "));

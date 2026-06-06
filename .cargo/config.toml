@@ -1,0 +1,6 @@
+# Propagate Linux libc++ link flags when running cargo from repo root.
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-lc++", "-C", "link-arg=-lc++abi"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-arg=-lc++", "-C", "link-arg=-lc++abi"]
