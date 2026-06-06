@@ -16,7 +16,7 @@
   --panel: #ffffff;
   --surface: #ffffff;
   --surface-soft: #f8f9fb;
-  --border: #d8dee8;
+  --border: rgba(0, 0, 0, 0.06);
   --text: #1a1a1a;
   --muted: #6b7280;
   --accent: #2b7fff;
@@ -37,7 +37,7 @@
   --panel: #1a1f2b;
   --surface: #1a1f2b;
   --surface-soft: #151a24;
-  --border: rgba(255, 255, 255, 0.1);
+  --border: rgba(255, 255, 255, 0.06);
   --text: #eef2f8;
   --muted: #9aa3b2;
   --accent: #3b82f6;

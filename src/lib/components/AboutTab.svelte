@@ -9,7 +9,6 @@
     "Forensic analysis — magic byte verification",
     "Entropy scanning & anomaly detection",
     "Batch hashing (MD5, SHA-1, SHA-256)",
-    "Archive conversion & split volumes",
     "100% offline · zero data collection",
   ];
 </script>
