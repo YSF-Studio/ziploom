@@ -70,6 +70,7 @@ ziploom/
 | `npm run test:ipc` | Static check: frontend `invoke()` ⊆ `generate_handler!` |
 | `npm run test:e2e` | 12 Rust integration tests (workflow + IPC registry) |
 | `npm run test:gui` | 20 Playwright UI smoke tests (incl. console error check) |
+| `npm run test:forensic` | Simulated digital forensic examiner workflow (CASE bundle + report) |
 | `npm run test:all` | IPC + E2E + GUI |
 | `npm run screenshots` | Regenerate `screenshots/*.png` |
 

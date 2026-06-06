@@ -14,6 +14,7 @@
     "test:gui": "npm run build && node tests/gui-smoke.mjs",
     "test:ipc": "node tests/ipc-coverage.mjs",
     "test:e2e": "cargo test --manifest-path src-tauri/Cargo.toml --tests --locked",
+    "test:forensic": "cargo test --manifest-path src-tauri/Cargo.toml --test forensic_exam_test -- --nocapture",
     "test:all": "npm run test:ipc && npm run test:e2e && npm run test:gui",
     "screenshots": "npm run build && node tests/capture-screenshots.mjs"
   },
