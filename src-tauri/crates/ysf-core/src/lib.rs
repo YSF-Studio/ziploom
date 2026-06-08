@@ -17,6 +17,7 @@ pub mod archive;
 pub mod forensic;
 pub mod ntfs;
 pub mod carving;
+pub mod scanner;
 pub mod report;
 pub mod snapshot;
 pub mod preview;
@@ -35,6 +36,7 @@ pub use archive::{
 };
 pub use ntfs::{parse_mft, MftEntry, FileAttribute, DeletedFile};
 pub use carving::{carve_files, CarvingResult, CarvedFile, MAGIC_SIGNATURES};
+pub use scanner::{ArchiveHeuristicSummary, HeuristicThreat, scan_archive_metadata, scan_archive_content};
 pub use report::generate_pdf_report;
 
 use once_cell::sync::Lazy;

@@ -1,6 +1,6 @@
 <script>
   import { formatSize } from "../format.js";
-  import { analyzeEntry, threatLevel, threatLabel, entropyPercent, copyText } from "../inspect.js";
+  import { analyzeEntry, threatLevel, threatLabel, entropyPercent, copyText, isMagicMismatch, isSuspiciousTimestamp } from "../inspect.js";
 
   let {
     rows = [],
@@ -57,6 +57,11 @@
     return s;
   }
 
+  function timestampClass(entry) {
+    const ts = entry.timestamp ?? entry.modified;
+    return isSuspiciousTimestamp(ts) ? "suspicious" : "";
+  }
+
   function indent(depth = 0) {
     return `${Math.max(0, depth) * 14}px`;
   }
@@ -83,7 +88,7 @@
         {#if showHash}<th class="col-hash">{hashAlgo.toUpperCase()}</th>{/if}
         {#if showEntropy}<th class="col-ent">Entropy</th>{/if}
         {#if showMagic}<th class="col-magic">Magic</th>{/if}
-        {#if showTimestamp}<th class="col-mod">Modified</th>{/if}
+        {#if showTimestamp}<th class="col-mod">Timestamp</th>{/if}
       </tr>
     </thead>
     <tbody>
@@ -97,6 +102,8 @@
           class:selected={focusedPath === e.path}
           class:threat-high={level === "high"}
           class:threat-medium={level === "medium"}
+          class:timestamp-suspicious={isSuspiciousTimestamp(e.timestamp ?? e.modified)}
+          class:magic-mismatch={isMagicMismatch(e)}
           onclick={() => onRowClick?.(e)}
         >
           <td class="col-check sticky-col">
@@ -144,10 +151,14 @@
             </td>
           {/if}
           {#if showMagic}
-            <td class="col-magic" title={e.detectedType ?? ""}>{formatMagic(e)}</td>
+            <td class="col-magic" title={`${e.detectedType ?? ""} ${e.magicMatch === false ? "(mismatch)" : ""}`.trim()}>
+              <span class:magic-mismatch={e.magicMatch === false}>{formatMagic(e)}</span>
+            </td>
           {/if}
           {#if showTimestamp}
-            <td class="col-mod" title={e.modified ?? ""}>{formatModified(e.modified)}</td>
+            <td class="col-mod" class:suspicious={isSuspiciousTimestamp(e.timestamp ?? e.modified)} title={e.timestamp ?? e.modified ?? ""}>
+              {formatModified(e.timestamp ?? e.modified)}
+            </td>
           {/if}
         </tr>
       {:else}
@@ -212,6 +223,11 @@
   tr.threat-high td { color: var(--err); }
   tr.threat-medium td { color: var(--warn); }
   tr.flagged td.name { font-weight: 600; }
+  tr.magic-mismatch td.col-magic,
+  tr.timestamp-suspicious td.col-mod {
+    color: var(--warn);
+    font-weight: 700;
+  }
   .name-inner {
     display: inline-block;
     max-width: 360px;
@@ -219,6 +235,8 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .magic-mismatch { color: var(--warn); font-weight: 700; }
+  .suspicious { color: var(--warn); font-weight: 700; }
   .fold-btn {
     border: none;
     background: none;

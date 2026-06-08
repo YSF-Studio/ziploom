@@ -12,6 +12,8 @@ pub struct FileEntry {
     pub compressed_size: Option<u64>,
     pub ratio: Option<f64>,
     pub modified: Option<String>,
+    pub timestamp: Option<String>,
+    pub timestamp_kind: Option<String>,
     pub permissions: Option<String>,
     // Computed on full scan
     pub md5: Option<String>,
@@ -148,6 +150,15 @@ fn load_zip(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String
                 t.hour(),
                 t.minute()
             )),
+            timestamp: Some(format!(
+                "{}-{:02}-{:02} {:02}:{:02}",
+                t.year(),
+                t.month(),
+                t.day(),
+                t.hour(),
+                t.minute()
+            )),
+            timestamp_kind: Some("archive-modified".into()),
             permissions: None,
             md5: None, sha1: None, sha256: None,
             entropy: None, magic_match: None,
@@ -185,6 +196,8 @@ fn load_7z(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String>
             compressed_size: Some(entry.compressed_size),
             ratio: None,
             modified: None,
+            timestamp: None,
+            timestamp_kind: None,
             permissions: None,
             md5: None, sha1: None, sha256: None,
             entropy: None, magic_match: None,
@@ -251,6 +264,8 @@ fn load_rar(path: &str, password: Option<&str>) -> Result<Vec<FileEntry>, String
                 None // pack_size not available in unrar 0.5
             } else { None },
             modified: None,
+            timestamp: None,
+            timestamp_kind: None,
             permissions: None,
             md5: None, sha1: None, sha256: None,
             entropy: None, magic_match: None,
@@ -303,6 +318,8 @@ fn load_tar(path: &str) -> Result<Vec<FileEntry>, String> {
             compressed_size: None,
             ratio: None,
             modified: Some(format!("{}", header.mtime().unwrap_or(0))),
+            timestamp: Some(format!("{}", header.mtime().unwrap_or(0))),
+            timestamp_kind: Some("archive-mtime".into()),
             permissions: Some(format!("{:o}", header.mode().unwrap_or(0))),
             md5: None, sha1: None, sha256: None,
             entropy: None, magic_match: None,
@@ -337,11 +354,32 @@ pub fn generate_forensic_report(
 
     super::progress::update_progress(5.0, "Reading archive contents…", 0, entries.len() as u64);
     super::forensic::enrich_entries_content(path, password, &mut entries)?;
+    let heuristic = crate::scanner::scan_archive_metadata(&entries);
+    let extra_content_threats = crate::scanner::scan_archive_content(path, password, &entries);
 
     let total_size: u64 = entries.iter().map(|e| e.size).sum();
     let mut anomalies: Vec<Anomaly> = vec![];
     let mut threats: Vec<Threat> = vec![];
-    let mut risk_score = 0.0f64;
+    let mut risk_score = heuristic.risk_score.min(1.0);
+
+    for ht in heuristic.threats {
+        threats.push(Threat {
+            file: ht.file,
+            threat: ht.threat,
+            category: ht.category,
+            severity: ht.severity,
+            detail: ht.detail,
+        });
+    }
+    for ht in extra_content_threats {
+        threats.push(Threat {
+            file: ht.file,
+            threat: ht.threat,
+            category: ht.category,
+            severity: ht.severity,
+            detail: ht.detail,
+        });
+    }
 
     let total = entries.len();
     for (i, entry) in entries.iter().enumerate() {
@@ -393,7 +431,7 @@ pub fn generate_forensic_report(
             }
         }
 
-        let suspicious_exts = ["exe", "dll", "sys", "bat", "ps1", "vbs", "js", "hta", "scr", "pif"];
+        let suspicious_exts = ["exe", "dll", "sys", "bat", "ps1", "vbs", "js", "hta", "scr", "pif", "msi", "com"];
         if suspicious_exts.contains(&ext) {
             threats.push(Threat {
                 file: entry.path.clone(),

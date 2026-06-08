@@ -32,7 +32,7 @@
 |-----|-----------------|
 | **Compress** | ZIP, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, TAR.ZST — drag & drop files/folders, compression level, optional **password-protected ZIP** (AES-256, 7-Zip / WinRAR compatible), clean macOS metadata |
 | **Extract** | ZIP, TAR, GZ, BZ2, XZ, ZST, **7z**, **RAR** — pure Rust, no external CLI; password dialog for encrypted archives |
-| **Inspect** | Load metadata → **Full Scan** (per-file MD5/SHA1/SHA256, entropy, magic bytes), tree/flat view, preview, threats/anomalies, CSV export, extract selected files |
+| **Inspect** | Load metadata → **Full Scan** (per-file MD5/SHA1/SHA256, Shannon entropy, magic-byte mismatch detection, timestamp awareness), tree/flat view, preview, threats/anomalies, CSV export, extract selected files |
 | **About** | Version, feature list, legal disclaimer, offline privacy statement |
 
 ### UI & privacy
@@ -41,13 +41,22 @@
 - **Drag & drop** on all workflow tabs
 - **100% offline** — no telemetry, no network calls for core features
 - Forensic results are **informational only** — verify independently before legal use
+- Inspect includes a 25+ signature magic-byte database, explicit detected-vs-extension mismatch cues, and timestamp anomaly highlighting
 
 ### Inspect highlights
 
 - Split layout: virtualized file table + detail/findings panel
 - Progress bar for long scans, hashing, and extraction
 - Preview inside archives (text / hex / image, size-capped)
-- Flagged-only filter, configurable columns, hash copy-on-click
+- Flagged-only filter, magic mismatch filter, suspicious timestamp filter, configurable columns, hash copy-on-click
+
+### Forensic disclaimer
+
+- ZipLoom is **not** a certified forensic tool.
+- Entropy, hash, magic-byte, timestamp, and heuristic scanner signals are for triage, reference, and education only.
+- Hashes are integrity checks, not a replacement for formal chain-of-custody procedures.
+- Anomalies and mismatches are indicators to investigate, not final conclusions.
+- All analysis is performed locally and offline. Nothing is uploaded or sent to a server.
 
 ---
 
@@ -68,7 +77,7 @@
 ### Inspect
 
 1. Select an archive → **Load**.
-2. Optional: **Full Scan** for hashes, entropy, magic-byte analysis.
+2. Optional: **Full Scan** for hashes, entropy, magic-byte analysis, and timestamp checks.
 3. Preview files, export CSV, or **Extract Selected**.
 
 → Full step-by-step guide: [**docs/USER_GUIDE.md**](docs/USER_GUIDE.md)

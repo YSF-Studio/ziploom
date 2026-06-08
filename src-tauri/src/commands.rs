@@ -20,6 +20,8 @@ pub struct ArchiveEntry {
     pub compressed_size: Option<u64>,
     pub is_dir: bool,
     pub modified: Option<String>,
+    pub timestamp: Option<String>,
+    pub timestamp_kind: Option<String>,
 }
 
 /// Result of inspecting an archive
@@ -77,6 +79,8 @@ pub fn inspect_archive_sync(path: String, password: Option<String>) -> Result<Ar
         compressed_size: e.compressed_size,
         is_dir: e.is_dir,
         modified: e.modified.clone(),
+        timestamp: e.timestamp.clone(),
+        timestamp_kind: e.timestamp_kind.clone(),
     }).collect();
 
     let total_size: u64 = archive_entries.iter().map(|e| e.size).sum();

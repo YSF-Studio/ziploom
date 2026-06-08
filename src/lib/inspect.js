@@ -25,6 +25,34 @@ export function isFlagged(entry, threatByPath = new Map()) {
   return flags.length > 0 || entry.magicMatch === false;
 }
 
+export function isMagicMismatch(entry) {
+  return !entry._folder && !entry.isDir && entry.magicMatch === false;
+}
+
+export function isSuspiciousTimestamp(value) {
+  if (!value) return false;
+  const raw = String(value).trim();
+  if (!raw || raw === "unknown" || raw === "invalid") return false;
+
+  let dt = null;
+  if (/^\d+$/.test(raw)) {
+    const n = Number(raw);
+    if (n > 10_000_000_000) {
+      dt = new Date(n / 1000);
+    } else {
+      dt = new Date(n * 1000);
+    }
+  } else {
+    dt = new Date(raw.replace(" UTC", "Z"));
+  }
+  if (!dt || Number.isNaN(dt.getTime())) return false;
+
+  const year = dt.getUTCFullYear();
+  const now = new Date();
+  const futureLimit = now.getTime() + 24 * 60 * 60 * 1000;
+  return year < 1980 || year > now.getUTCFullYear() + 1 || dt.getTime() > futureLimit;
+}
+
 export function threatLevel(entry, threatByPath = new Map(), scanDone = false) {
   if (entry._folder || entry.isDir) return "none";
   const backend = threatByPath.get(entry.path);
@@ -80,6 +108,15 @@ export function filterEntriesAdvanced(entries, { query = "", flaggedOnly = false
     list = list.filter((e) => isFlagged(e, threatByPath));
   }
   return list;
+}
+
+export function sortByTimestamp(entries, dir = "asc") {
+  const mul = dir === "desc" ? -1 : 1;
+  return [...entries].sort((a, b) => {
+    const av = Date.parse((a.timestamp ?? a.modified ?? "").replace(" UTC", "Z")) || 0;
+    const bv = Date.parse((b.timestamp ?? b.modified ?? "").replace(" UTC", "Z")) || 0;
+    return (av - bv) * mul;
+  });
 }
 
 export function sortEntries(entries, key, dir) {
@@ -171,14 +208,14 @@ export function exportReport(info, format) {
   }
   if (format === "csv") {
     const lines = [
-      "path,type,size,compressed,modified,entropy,magic,detected_type,md5,sha1,sha256,flags",
+      "path,type,size,compressed,timestamp,entropy,magic,detected_type,md5,sha1,sha256,flags",
     ];
     for (const e of rows) {
       const flags = analyzeEntry(e).join("|");
       const magic =
         e.magicMatch === true ? "match" : e.magicMatch === false ? "mismatch" : "";
       lines.push(
-        `"${e.path}",${e.isDir ? "dir" : "file"},${e.size},${e.compressedSize ?? ""},"${e.modified ?? ""}",${e.entropy ?? ""},"${magic}","${e.detectedType ?? ""}","${e.md5 ?? ""}","${e.sha1 ?? ""}","${e.sha256 ?? ""}","${flags}"`
+        `"${e.path}",${e.isDir ? "dir" : "file"},${e.size},${e.compressedSize ?? ""},"${e.timestamp ?? e.modified ?? ""}",${e.entropy ?? ""},"${magic}","${e.detectedType ?? ""}","${e.md5 ?? ""}","${e.sha1 ?? ""}","${e.sha256 ?? ""}","${flags}"`
       );
     }
     return lines.join("\n");

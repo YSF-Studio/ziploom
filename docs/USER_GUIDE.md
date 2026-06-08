@@ -148,7 +148,7 @@ Select archive → Load metadata → (optional) Full Scan → Preview / Export /
 
 | Button | Purpose |
 |--------|---------|
-| **Full Scan** | Per-file MD5/SHA1/SHA256, entropy, magic bytes, threat/anomaly detection |
+| **Full Scan** | Per-file MD5/SHA1/SHA256, Shannon entropy, magic-byte mismatch detection, timestamp checks, threat/anomaly detection |
 | **Hash All** | Hash the archive file (container) as a whole |
 | **Export CSV** | Export a report to CSV |
 | **Extract Selected** | Extract only checked files |
@@ -158,12 +158,23 @@ Select archive → Load metadata → (optional) Full Scan → Preview / Export /
 - **Tree / Flat** — hierarchical or flat listing
 - **Search** — filter by path name
 - **Flagged only** — show flagged entries only
-- **Columns ▾** — toggle Hash, Entropy, Magic, Modified columns
-- **Detail panel** — text/hex/image preview (size-limited), risk summary, threats/anomalies tabs
+- **Magic mismatch only** — show only files whose content header does not match the extension
+- **Suspicious timestamp only** — show entries with implausible timestamps
+- **Columns ▾** — toggle Hash, Entropy, Magic/mismatch, Timestamp columns
+- **Detail panel** — text/hex/image preview (size-limited), detected-vs-extension magic verdict, risk summary, threats/anomalies tabs
 
 ### File preview
 
 Click a row to load a read-only preview in the right panel (no execution).
+
+### Forensic notes
+
+- Shannon entropy is computed per file and values above **7.5** are highlighted as high-entropy / likely packed or encrypted data.
+- The magic-byte database contains 25+ signatures for common archive, image, document, executable, and container formats.
+- The heuristic scanner flags archive bombs, path traversal, absolute paths, deep nesting, suspicious executables, PDF script markers, Office macro markers, LNK shortcut targets, and related anomalies.
+- The UI highlights mismatch cases where the file header and extension disagree.
+- Timestamp anomalies are highlighted when the timestamp looks implausible, such as far in the past or in the future.
+- ZipLoom is not a certified forensic suite; use the output for triage, reference, and education, then verify independently for legal or evidentiary work.
 
 ---
 

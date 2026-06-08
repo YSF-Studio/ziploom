@@ -12,10 +12,13 @@
     riskSummary,
     filterEntriesAdvanced,
     sortEntries,
+    sortByTimestamp,
     exportReport,
     buildTreeStructure,
     flattenTree,
     isFlagged,
+    isMagicMismatch,
+    isSuspiciousTimestamp,
   } from "../inspect.js";
   import { notify } from "../toast.js";
   import { promptPassword, withArchivePassword } from "../password.js";
@@ -32,6 +35,8 @@
   let sortDir = $state("asc");
   let query = $state("");
   let flaggedOnly = $state(false);
+  let mismatchOnly = $state(false);
+  let suspiciousTimestampOnly = $state(false);
   let selected = $state(new Set());
   let collapsed = $state(new Set());
 
@@ -69,12 +74,15 @@
       compressedSize: e.compressedSize ?? e.compressed_size,
       isDir: e.isDir ?? e.is_dir,
       modified: e.modified,
+      timestamp: e.timestamp ?? e.modified ?? null,
+      timestampKind: e.timestampKind ?? e.timestamp_kind ?? null,
       md5: e.md5 ?? null,
       sha1: e.sha1 ?? e.sha_1 ?? null,
       sha256: e.sha256 ?? null,
       entropy: e.entropy ?? null,
       magicMatch: e.magicMatch ?? e.magic_match ?? null,
       detectedType: e.detectedType ?? e.detected_type ?? null,
+      expectedType: e.expectedType ?? e.expected_type ?? null,
     };
   }
 
@@ -125,15 +133,18 @@
 
   const displayEntries = $derived.by(() => {
     if (!info) return [];
-    const files = filterEntriesAdvanced(info.entries ?? [], {
+    let files = filterEntriesAdvanced(info.entries ?? [], {
       query,
       flaggedOnly,
       threatByPath,
     });
+    if (mismatchOnly) files = files.filter((e) => isMagicMismatch(e));
+    if (suspiciousTimestampOnly) files = files.filter((e) => isSuspiciousTimestamp(e.timestamp ?? e.modified));
     if (viewMode === "tree") {
       const tree = buildTreeStructure(files);
       return flattenTree(tree, collapsed);
     }
+    if (sortKey === "timestamp") return sortByTimestamp(files, sortDir);
     return sortEntries(files, sortKey, sortDir);
   });
 
@@ -445,12 +456,21 @@
           <input type="checkbox" bind:checked={flaggedOnly} />
           Flagged only
         </label>
+        <label class="filter-flag">
+          <input type="checkbox" bind:checked={mismatchOnly} />
+          Magic mismatch only
+        </label>
+        <label class="filter-flag">
+          <input type="checkbox" bind:checked={suspiciousTimestampOnly} />
+          Suspicious timestamp only
+        </label>
         <label>
           Sort
           <select bind:value={sortKey}>
             <option value="path">Name</option>
             <option value="size">Size</option>
             <option value="entropy">Entropy</option>
+            <option value="timestamp">Timestamp</option>
           </select>
         </label>
         <select bind:value={sortDir} aria-label="Sort direction">
@@ -471,8 +491,8 @@
             <div class="col-menu" role="menu" tabindex="0" onclick={(e) => e.stopPropagation()}>
               <label><input type="checkbox" bind:checked={showHash} /> Hash</label>
               <label><input type="checkbox" bind:checked={showEntropy} /> Entropy</label>
-              <label><input type="checkbox" bind:checked={showMagic} /> Magic</label>
-              <label><input type="checkbox" bind:checked={showTimestamp} /> Modified</label>
+              <label><input type="checkbox" bind:checked={showMagic} /> Magic / mismatch</label>
+              <label><input type="checkbox" bind:checked={showTimestamp} /> Timestamp</label>
             </div>
           {/if}
         </div>
@@ -525,7 +545,7 @@
   {:else if !archive}
     <div class="empty-hint">
       <p>Load an archive to inspect its contents.</p>
-      <p class="sub">Full Scan adds per-file MD5/SHA1/SHA256, entropy, and magic-byte analysis.</p>
+      <p class="sub">Full Scan adds per-file MD5/SHA1/SHA256, Shannon entropy, magic-byte mismatch detection, and timestamp awareness.</p>
     </div>
   {/if}
 </div>

@@ -2,6 +2,9 @@
 /// Located in tests/ for integration test access
 
 use ysf_core::*;
+use std::io::Write;
+use tempfile::tempdir;
+use zip::write::SimpleFileOptions;
 
 // ═══ Entropy Tests ═══
 
@@ -101,6 +104,56 @@ fn magic_unknown_extension_not_flagged() {
 fn magic_empty_file() {
     let (m, _, _) = check_magic_bytes(b"", "empty.txt");
     assert_eq!(m, None);
+}
+
+#[test]
+fn magic_db_has_25_plus_signatures() {
+    assert!(
+        hashing::MAGIC_DB.len() >= 25,
+        "expected at least 25 signatures, got {}",
+        hashing::MAGIC_DB.len()
+    );
+}
+
+#[test]
+fn scanner_flags_pdf_lnk_and_ole_markers() {
+    let dir = tempdir().unwrap();
+    let archive_path = dir.path().join("scanner-fixture.zip");
+
+    let file = std::fs::File::create(&archive_path).unwrap();
+    let mut zip = zip::ZipWriter::new(file);
+    let opts = SimpleFileOptions::default();
+
+    zip.start_file("docs/report.pdf", opts).unwrap();
+    zip.write_all(b"%PDF-1.4\n1 0 obj\n<< /OpenAction << /S /JavaScript >> >>\nstream\nfunction test(){app.alert('x');}\nendstream\n%%EOF").unwrap();
+
+    zip.start_file("shortcuts/dropper.lnk", opts).unwrap();
+    zip.write_all(&[
+        0x4C, 0x00, 0x00, 0x00,
+        0x01, 0x14, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x46,
+        0x22, 0x00, 0x00, 0x00,
+        0x43, 0x00, 0x00, 0x00,
+    ]).unwrap();
+    let lnk_target: Vec<u8> = "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+        .encode_utf16()
+        .flat_map(|u| u.to_le_bytes())
+        .collect();
+    zip.write_all(&lnk_target).unwrap();
+
+    zip.start_file("office/macro.doc", opts).unwrap();
+    zip.write_all(b"\xd0\xcf\x11\xe0macro header WordDocument _VBA_PROJECT AutoOpen WScript.Shell CreateObject").unwrap();
+
+    zip.finish().unwrap();
+
+    let entries = forensic_load(archive_path.to_str().unwrap(), None).unwrap();
+    let metadata = scan_archive_metadata(&entries);
+    assert!(!metadata.threats.iter().any(|t| t.threat == "File flood"), "unexpected file flood");
+
+    let content_threats = scan_archive_content(archive_path.to_str().unwrap(), None, &entries);
+    assert!(content_threats.iter().any(|t| t.threat == "PDF with JavaScript"), "missing PDF heuristic");
+    assert!(content_threats.iter().any(|t| t.threat.contains("LNK")), "missing LNK heuristic");
+    assert!(content_threats.iter().any(|t| t.threat == "OLE/VBA macro markers"), "missing OLE/VBA heuristic");
 }
 
 // ═══ Hash Tests ═══
