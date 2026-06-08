@@ -1,15 +1,5 @@
 {
   "bundle": {
     "targets": ["dmg", "app"]
-  },
-  "app": {
-    "windows": [
-      {
-        "decorations": true,
-        "titleBarStyle": "Overlay",
-        "hiddenTitle": true,
-        "trafficLightPosition": { "x": 14, "y": 18 }
-      }
-    ]
   }
 }

@@ -13,7 +13,7 @@
     "windows": [
       {
         "title": "ZipLoom",
-        "decorations": false,
+        "decorations": true,
         "width": 900,
         "height": 600,
         "resizable": true
