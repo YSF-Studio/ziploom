@@ -16,6 +16,8 @@
 
 ## Screenshots
 
+Captured in light mode using real sample-file paths and fixture-backed data so the UI reflects the app’s actual archive workflow.
+
 | Compress | Extract |
 |:--------:|:-------:|
 | ![Compress](screenshots/compress.png) | ![Extract](screenshots/extract.png) |

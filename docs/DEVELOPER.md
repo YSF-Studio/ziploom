@@ -175,6 +175,7 @@ git add screenshots/
 ```
 
 Requires a running or buildable app context per `tests/capture-screenshots.mjs`.
+The capture flow uses light mode and real sample-file paths through fixture-backed IPC so documentation screenshots mirror the real archive workflow as closely as possible.
 
 ## License
 
