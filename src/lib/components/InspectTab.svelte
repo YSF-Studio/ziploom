@@ -117,6 +117,12 @@
     scanDone = true;
   }
 
+  function selectDefaultEntry() {
+    if (focusedEntry || !info?.entries?.length) return;
+    const first = info.entries.find((e) => !e.isDir && !e._folder) ?? info.entries[0];
+    if (first) focusedEntry = first;
+  }
+
   const risk = $derived(
     forensicMeta?.riskLabel ?? (info ? riskSummary(info.entries ?? []) : null)
   );
@@ -198,6 +204,7 @@
       error = String(e);
       notify(onToast, error, "error");
     } finally {
+      selectDefaultEntry();
       busy = false;
       onBusy?.(false);
     }

@@ -217,13 +217,13 @@ async function waitForServer(url, ms = 30000) {
 
 function startPreview() {
   return new Promise((resolve, reject) => {
-    const proc = spawn("npx", ["vite", "preview", "--port", "1422", "--strictPort"], {
+    const proc = spawn("npx", ["vite", "preview", "--configLoader", "runner", "--host", "127.0.0.1", "--port", "1422", "--strictPort"], {
       cwd: ROOT,
       stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, FORCE_COLOR: "0" },
     });
     proc.on("error", reject);
-    waitForServer("http://localhost:1422/")
+    waitForServer("http://127.0.0.1:1422/")
       .then(() => resolve(proc))
       .catch(reject);
   });
@@ -248,7 +248,7 @@ async function run() {
     });
     page.on("pageerror", (err) => consoleErrors.push(err.message));
     await page.addInitScript(mockInitScript(FIXTURE, OUT));
-    await page.goto("http://localhost:1422/", { waitUntil: "networkidle" });
+    await page.goto("http://127.0.0.1:1422/", { waitUntil: "networkidle" });
 
     // ── Shell ──
     await page.waitForSelector(".brand .title", { text: "ZipLoom" });

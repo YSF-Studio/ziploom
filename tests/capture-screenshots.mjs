@@ -104,7 +104,7 @@ async function waitForServer(url, ms = 30000) {
 
 function startPreview() {
   return new Promise((resolve, reject) => {
-    const proc = spawn("npx", ["vite", "preview", "--port", "1422", "--strictPort"], {
+    const proc = spawn("npx", ["vite", "preview", "--configLoader", "runner", "--host", "127.0.0.1", "--port", "1422", "--strictPort"], {
       cwd: ROOT,
       stdio: "pipe",
     });
@@ -125,7 +125,7 @@ async function main() {
   const browser = await chromium.launch();
   try {
     preview = await startPreview();
-    await waitForServer("http://localhost:1422/");
+    await waitForServer("http://127.0.0.1:1422/");
 
     const context = await browser.newContext({
       viewport: { width: 960, height: 640 },
@@ -133,7 +133,7 @@ async function main() {
     });
     const page = await context.newPage();
     await page.addInitScript(mockInitScript(FIXTURE, SAMPLES, OUT));
-    await page.goto("http://localhost:1422/", { waitUntil: "networkidle" });
+    await page.goto("http://127.0.0.1:1422/", { waitUntil: "networkidle" });
 
     const tabstrip = page.locator(".tabstrip");
 
