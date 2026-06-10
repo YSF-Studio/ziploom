@@ -18,6 +18,15 @@
   } = $props();
 
   let panelTab = $state("findings");
+  let lastEntryPath = $state("");
+
+  $effect(() => {
+    const path = entry?.path ?? "";
+    if (path && path !== lastEntryPath) {
+      panelTab = "details";
+    }
+    lastEntryPath = path;
+  });
 
   const summary = $derived.by(() => {
     const all = [...threats, ...anomalies.map((a) => ({
